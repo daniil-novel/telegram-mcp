@@ -1,0 +1,20 @@
+{
+  "name": "telegram-readonly-mcp",
+  "interface": {
+    "displayName": "Telegram Read-only"
+  },
+  "plugins": [
+    {
+      "name": "telegram-readonly-mcp",
+      "source": {
+        "source": "local",
+        "path": "./plugins/telegram-readonly-mcp"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

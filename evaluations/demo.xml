@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<evaluation source="synthetic DemoBackend only; serve --demo">
+  <qa_pair><question>List every demo dialog, following pagination with limit=1. How many are there?</question><answer>3</answer></qa_pair>
+  <qa_pair><question>Find the archived dialog by walking list_dialogs with limit=1; verify message 3 exists in its history. Return its chat ID.</question><answer>-202</answer></qa_pair>
+  <qa_pair><question>Search dialog titles case-insensitively for ГРУППА, then read its latest message to verify access. Return the matching chat ID.</question><answer>-202</answer></qa_pair>
+  <qa_pair><question>Read all history in chat 101 in pages of two. How many messages exist?</question><answer>4</answer></qa_pair>
+  <qa_pair><question>Find the ordinary group through list_dialogs, read its history, then fetch message 3 and return its text.</question><answer>Демо: задача 3</answer></qa_pair>
+  <qa_pair><question>Globally search задача in pages of two until exhausted. How many distinct (chat_id,id) pairs match?</question><answer>12</answer></qa_pair>
+  <qa_pair><question>Find the private dialog through list_dialogs, search задача there with limit=2 and follow the cursor. How many match?</question><answer>4</answer></qa_pair>
+  <qa_pair><question>Read latest messages across every dialog with per_chat_limit=2, limit=1. How many distinct messages are returned?</question><answer>6</answer></qa_pair>
+  <qa_pair><question>Read all unread incoming messages, following the cursor. How many messages are returned?</question><answer>6</answer></qa_pair>
+  <qa_pair><question>Find the private dialog through list_dialogs. Read it in pages of one between 2026-10-02T12:00:02+03:00 inclusive and 2026-10-02T12:00:04+03:00 exclusive. Return newest-first message IDs separated by a comma.</question><answer>3,2</answer></qa_pair>
+</evaluation>

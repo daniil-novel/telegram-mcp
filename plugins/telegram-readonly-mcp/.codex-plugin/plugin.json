@@ -1,0 +1,27 @@
+{
+  "name": "telegram-readonly-mcp",
+  "version": "0.1.0",
+  "description": "Read Telegram cloud chats, groups and channels through a guarded local MTProto MCP. User-only interactive authorization.",
+  "author": {
+    "name": "daniil-novel"
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Telegram Read-only",
+    "shortDescription": "Read and search Telegram when you ask.",
+    "longDescription": "Seven read-only tools for dialogs, history, messages, search, unread, latest and date ranges. Local session storage and ACL. Never sends, changes, deletes or marks messages read. Requires user authorization in a local terminal.",
+    "developerName": "daniil-novel",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Search"
+    ],
+    "defaultPrompt": [
+      "Use Telegram Read-only to list my chats.",
+      "Read unread messages and summarize tasks for me.",
+      "Search my Telegram chats for the requested topic."
+    ]
+  },
+  "repository": "https://github.com/daniil-novel/telegram-readonly-mcp"
+}

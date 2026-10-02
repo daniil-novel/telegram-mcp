@@ -1,0 +1,8 @@
+{
+  "note": "Reference values for the ChatGPT UI, not an importable ChatGPT config file.",
+  "name": "Telegram Read-only",
+  "mcp_url": "https://YOUR-OAUTH-GATEWAY.example/mcp",
+  "authentication": "OAuth",
+  "deployment_required": "A reachable HTTPS OAuth gateway validating user-bound MCP tokens, then proxying to this private server with its backend bearer token. Gateway not implemented in this project.",
+  "warning": "ChatGPT web does not connect to local stdio/127.0.0.1 and this project's static bearer token alone is not a supported Developer Mode OAuth login. Do not expose a No Authentication endpoint."
+}

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "telegram_readonly": {
+      "command": "C:/ABSOLUTE/PATH/telegram-readonly-mcp/.venv/Scripts/python.exe",
+      "args": [
+        "-m", "telegram_readonly_mcp",
+        "--env-file", "C:/ABSOLUTE/PATH/telegram-readonly-mcp/.env",
+        "serve"
+      ]
+    }
+  }
+}

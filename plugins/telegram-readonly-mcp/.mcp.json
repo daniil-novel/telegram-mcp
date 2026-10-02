@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "telegram_readonly": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$base=Join-Path $env:LOCALAPPDATA 'TelegramReadOnlyMCP'; $py=Join-Path $base 'runtime\\Scripts\\python.exe'; $cfg=Join-Path $base 'config\\.env'; if (!(Test-Path -LiteralPath $py)) { [Console]::Error.WriteLine('Run scripts/Install-Windows.ps1 from the repository first.'); exit 1 }; & $py -m telegram_readonly_mcp --env-file $cfg serve; exit $LASTEXITCODE"
+      ],
+      "startup_timeout_sec": 60,
+      "tool_timeout_sec": 60
+    }
+  }
+}
