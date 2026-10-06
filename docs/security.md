@@ -54,15 +54,18 @@ Public visibility permits cloning and forking; it does not grant original-reposi
 
 GitHub secret scanning/push protection, Dependabot alerts/security updates and private vulnerability reporting are enabled. GitHub's generic non-provider secret patterns are not enabled; custom or arbitrary Telegram credentials can escape provider-pattern detection. Fork workflows require approval for external contributors, and default Actions token permissions are read-only with Actions PR approval disabled.
 
+A narrowly scoped branch exception lets the official Dependabot app create/update its dependency branches under `dependabot/`, including nested paths. It grants no exception for `main` and no automatic merge: the owner reviews Dependabot PRs, and the mandatory checks and CodeQL findings gate still apply.
+
 The [CI workflow](../.github/workflows/ci.yml) runs account-free tests, lint, formatting and build checks across Windows/Linux/macOS. Configuration is not proof of a passing run: inspect the result for the exact commit in [Actions](https://github.com/daniil-novel/telegram-mcp/actions) and the recorded [validation evidence](../VALIDATION.md). Live Telegram writes and private conversations do not belong in CI fixtures or secrets.
 
 ### Main and original-repository branches
 
-Three active GitHub rulesets separate review flexibility from mandatory checks:
+Four active GitHub rulesets separate review flexibility from mandatory checks:
 
-- [Main core rules](https://github.com/daniil-novel/telegram-mcp/rules/24572891): changes through a PR, required checks, up-to-date branches, resolved conversations and linear history. Force pushes/deletion are blocked. **No bypass actor**, including the owner, is configured for this ruleset.
+- [Main core rules](https://github.com/daniil-novel/telegram-mcp/rules/24572891): changes through a PR, **13 mandatory checks**, up-to-date branches, resolved conversations and linear history. A separate CodeQL findings rule requires security threshold `all` and other-alert threshold `errors_and_warnings`. Force pushes/deletion are blocked. **No bypass actor**, including the owner, is configured for this ruleset.
 - [Main review rules](https://github.com/daniil-novel/telegram-mcp/rules/24572892): one code-owner approval, dismissed when changes make it stale. The designated reviewer is **@daniil-novel**. This owner has a **PR-only review exception** so their own maintenance PR can merge after core checks pass.
-- [Other original branches](https://github.com/daniil-novel/telegram-mcp/rules/24572895): creation/update/deletion restricted to the maintainer. Community contributors work in forks; these restrictions do not control branches in someone else's fork.
+- [Other original branches](https://github.com/daniil-novel/telegram-mcp/rules/24572895): branches outside `main` and the `dependabot/` namespace are restricted to the maintainer for creation/update/deletion. Community contributors work in forks; these restrictions do not control branches in someone else's fork.
+- [Dependabot branches](https://github.com/daniil-novel/telegram-mcp/rules/24574015): only the owner and official Dependabot app (GitHub App ID `29110`) can create/update/delete branches matching `refs/heads/dependabot/*` or `refs/heads/dependabot/**/*`. Both patterns cover direct and nested dependency branches. The bot has no bypass in either `main` ruleset.
 
 Contributor PRs are expected to receive the owner's review. GitHub's review exception is tied to the maintainer actor, not the PR's author; it should be used for the owner's own PRs. It does not bypass the separate core rules or enable direct `main` pushes. The policy does not claim an independent second-person review of owner-authored changes.
 

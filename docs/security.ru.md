@@ -54,15 +54,18 @@ ACL чтения фильтрует MCP-ответ и адресные запр�
 
 Включены GitHub secret scanning/push protection, Dependabot alerts/security updates и private vulnerability reporting. Generic non-provider secret patterns GitHub не включены; нестандартные/произвольные Telegram credentials могут избежать provider-pattern проверки. Workflow внешних участников требуют разрешения; default Actions token имеет права чтения, одобрение PR через Actions отключено.
 
+Узкое исключение разрешает официальному приложению Dependabot создавать/обновлять ветки зависимостей внутри `dependabot/`, включая вложенные пути. Исключения для `main` и автоматического слияния нет: владелец проверяет PR Dependabot, обязательные checks и правило находок CodeQL продолжают действовать.
+
 [CI workflow](../.github/workflows/ci.yml) выполняет тесты без аккаунта, lint, форматирование и build на Windows/Linux/macOS. Конфигурация не доказывает успешный запуск: проверяйте результат нужного commit в [Actions](https://github.com/daniil-novel/telegram-mcp/actions) и [подтверждение проверок](../VALIDATION.md). Реальные Telegram-записи и личная переписка не должны попадать в fixtures или secrets CI.
 
 ### Main и ветки исходного репозитория
 
-Три активных GitHub ruleset разделяют исключение для review и обязательные checks:
+Четыре активных GitHub ruleset разделяют исключение для review и обязательные checks:
 
-- [Основные правила main](https://github.com/daniil-novel/telegram-mcp/rules/24572891): изменение через PR, обязательные checks, актуальная ветка, закрытые обсуждения и линейная история. Force push/удаление запрещены. **Bypass не настроен ни для кого**, включая владельца, в этом ruleset.
+- [Основные правила main](https://github.com/daniil-novel/telegram-mcp/rules/24572891): изменение через PR, **13 обязательных checks**, актуальная ветка, закрытые обсуждения и линейная история. Отдельное правило находок CodeQL задаёт security threshold `all` и порог остальных alerts `errors_and_warnings`. Force push/удаление запрещены. **Bypass не настроен ни для кого**, включая владельца, в этом ruleset.
 - [Правила review main](https://github.com/daniil-novel/telegram-mcp/rules/24572892): одно одобрение code owner, устаревшее после изменений снимается. Назначенный reviewer — **@daniil-novel**. У владельца есть **исключение для review только через PR**, чтобы слить собственный maintenance PR после основных checks.
-- [Другие исходные ветки](https://github.com/daniil-novel/telegram-mcp/rules/24572895): создание/изменение/удаление разрешено maintainer. Участники работают в fork; правила не управляют ветками чужого fork.
+- [Другие исходные ветки](https://github.com/daniil-novel/telegram-mcp/rules/24572895): вне `main` и пространства `dependabot/` создание/изменение/удаление веток разрешено только maintainer. Участники работают в fork; правила не управляют ветками чужого fork.
+- [Ветки Dependabot](https://github.com/daniil-novel/telegram-mcp/rules/24574015): только владелец и официальное приложение Dependabot (GitHub App ID `29110`) могут создавать/изменять/удалять ветки по шаблонам `refs/heads/dependabot/*` и `refs/heads/dependabot/**/*`. Оба шаблона охватывают прямые и вложенные ветки зависимостей. У бота нет bypass ни в одном ruleset для `main`.
 
 PR участников должны получать review владельца. GitHub привязывает исключение к maintainer, а не к автору PR; оно предназначено для собственных PR владельца. Оно не отменяет отдельные основные правила и не разрешает прямой push в `main`. Независимый review вторым человеком собственных изменений владельца не заявляется.
 

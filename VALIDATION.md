@@ -36,14 +36,51 @@ data only, without accessing a real Telegram account, `.env`, or session.
   against SHA-256 release metadata before execution. Actions use full commit
   pins; CI uses uv 0.12.21. Runtime/scanner dependencies use the reviewed uv lock.
 
-The new [Security](.github/workflows/security.yml) and
-[CodeQL](.github/workflows/codeql.yml) workflows configure recurring and PR
-checks. Configuration is separate from completed results: inspect checks and
-code-scanning alerts for the exact revision in
-[GitHub Actions](https://github.com/daniil-novel/telegram-mcp/actions).
-CodeQL was not executed locally. Do not interpret successful static analysis,
-unit tests or repository rules as a promise of no prompt injection, PII leakage
-through permitted message content, account compromise or unknown vulnerabilities.
+### Completed in GitHub Actions for 0.2.1
+
+Both the [PR #1](https://github.com/daniil-novel/telegram-mcp/pull/1) revision and
+merged `main` revision completed CI, Security and CodeQL successfully:
+
+| Revision | CI | Security | CodeQL |
+| --- | --- | --- | --- |
+| PR head `9b3e213e379f0c5e5bd159d7ac8383b1a614c9c3` | [37450364838](https://github.com/daniil-novel/telegram-mcp/actions/runs/37450364838) | [37450364828](https://github.com/daniil-novel/telegram-mcp/actions/runs/37450364828) | [37450364990](https://github.com/daniil-novel/telegram-mcp/actions/runs/37450364990) |
+| Merged main `2a3fa778f1f5e04c2c7c964c0449657729b1d2e3` | [37450707899](https://github.com/daniil-novel/telegram-mcp/actions/runs/37450707899) | [37450707789](https://github.com/daniil-novel/telegram-mcp/actions/runs/37450707789) | [37450707934](https://github.com/daniil-novel/telegram-mcp/actions/runs/37450707934) |
+
+Each CI matrix job passed **157 tests** on Ubuntu/Python 3.11, 3.12 and 3.13,
+Windows/Python 3.11 and macOS/Python 3.11, together with lint, format and build.
+Security checks passed; dependency review ran on the PR, while that PR-only job
+is skipped on a `main` push. CodeQL was executed on GitHub, not locally.
+
+An administrator also verified the CodeQL records for the exact merged
+`2a3fa77` revision: Python analysis `1899908741` and Actions analysis
+`1899908507`, with empty analysis errors/warnings and **0 code-scanning alerts**
+at the evidence cutoff. See [code scanning](https://github.com/daniil-novel/telegram-mcp/security/code-scanning).
+Successful workflow execution alone is not proof that no findings exist.
+
+### Active repository gates at the evidence cutoff
+
+- [Main core rules](https://github.com/daniil-novel/telegram-mcp/rules/24572891)
+  require PRs and **13 mandatory checks**, with **no bypass actors**. CodeQL
+  findings are gated separately within that ruleset: security threshold `all`,
+  other-alert threshold `errors_and_warnings`.
+- [Contributor review](https://github.com/daniil-novel/telegram-mcp/rules/24572892)
+  requires one code-owner approval. Only owner User `80037801` has the PR-only
+  review exception; it cannot bypass the core gates.
+- [Other upstream branches](https://github.com/daniil-novel/telegram-mcp/rules/24572895)
+  remain owner-only outside `main` and the narrowly excluded `dependabot/`
+  namespace.
+- [Dependabot branches](https://github.com/daniil-novel/telegram-mcp/rules/24574015)
+  allow only owner User `80037801` and official Dependabot Integration `29110`
+  to create/update/delete branches matching `refs/heads/dependabot/*` or
+  `refs/heads/dependabot/**/*`. Both patterns are also excluded from the
+  owner-only non-main ruleset. Dependabot alerts/security updates are enabled;
+  the bot has no bypass in either `main` ruleset and no automatic merge.
+  The owner reviews its PRs, which must pass all core checks and the CodeQL gate.
+
+Rules and alert state can change after this cutoff. Inspect results for the
+exact revision in [GitHub Actions](https://github.com/daniil-novel/telegram-mcp/actions).
+Do not interpret static analysis, tests or rules as a promise of no prompt
+injection, PII leakage through permitted content, account compromise or unknown bugs.
 
 ## Previous 0.2.0 evidence
 
