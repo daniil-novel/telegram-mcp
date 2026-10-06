@@ -19,6 +19,32 @@ No real Telegram message was sent, edited, deleted, marked read or downloaded.
   server-error write outcomes and service-message read compatibility); no
   remaining actionable blocker in the reviewed implementation.
 
+## Completed in GitHub Actions
+
+The [CI run 37444145637](https://github.com/daniil-novel/telegram-mcp/actions/runs/37444145637)
+completed successfully on 2026-10-06 for source commit
+`ffa88352fceaa11dad63b8e1d7916316dd9474a6` (push event, attempt 1).
+The run status, all five job results and each job's decoded logs were inspected
+through GitHub's API; results below are actual completed checks.
+
+| Hosted runner | CPython in job log | Synthetic tests | Job result |
+| --- | --- | --- | --- |
+| Ubuntu (`ubuntu-latest`) | 3.11.16 | 103 passed in 9.60s | Success |
+| Ubuntu (`ubuntu-latest`) | 3.12.14 | 103 passed in 10.32s | Success |
+| Ubuntu (`ubuntu-latest`) | 3.13.15 | 103 passed in 10.35s | Success |
+| Windows (`windows-latest`) | 3.11.9 | 103 passed in 8.02s | Success |
+| macOS (`macos-latest`) | 3.11.9 | 103 passed in 6.86s | Success |
+
+Every job passed the frozen dependency installation, Ruff lint and formatting,
+the full test suite, and building both `telegram_mcp-0.2.0.tar.gz` and
+`telegram_mcp-0.2.0-py3-none-any.whl`. The workflow uses no real Telegram
+credentials; tests use fake Telegram responses, fictional demo data and
+temporary session files. These checks verify installation, test behavior and
+package builds on the listed hosted runners, not live Telegram operations or
+Docker execution. This evidence is bound to the source commit above. The later
+Windows installer migration was syntax-checked locally; its commands were not
+executed end to end. The Telegram runtime code is unchanged from that CI run.
+
 ## Behavior covered
 
 - Seven read tools by default; three write tools appear only when enabled.
@@ -51,8 +77,9 @@ language links and OS-specific setup; image provenance is in docs/images/README.
 
 - Live send/edit/delete was intentionally not performed against the user's
   account. Telegram's live permissions/edit windows/rate limits still apply.
-- Linux/macOS and Python 3.12/3.13 checks are configured in GitHub Actions; their
-  actual status must be read from the workflow, not inferred from Windows tests.
+- Hosted Linux/macOS/Windows and Python 3.11/3.12/3.13 checks passed as recorded
+  above. Other Python/OS combinations and users' live environments were not
+  verified by that matrix.
 - Docker Engine was unavailable locally. Container build/login is not verified
   here; Windows DPAPI sessions cannot be copied into a Linux container.
 - No public HTTPS/OAuth gateway for ChatGPT web is deployed by this project.
