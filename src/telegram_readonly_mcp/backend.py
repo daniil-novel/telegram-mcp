@@ -89,7 +89,7 @@ class TelegramBackend:
             self.settings.api_hash.get_secret_value(),
             write_settings=self.settings,
             device_model="Unofficial Telegram MCP",
-            app_version="0.2.1",
+            app_version="0.2.2",
         )
         try:
             await self.client.connect()

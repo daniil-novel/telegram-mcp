@@ -54,7 +54,7 @@ async def authorize(settings: Settings) -> None:
         settings.api_hash.get_secret_value(),
         authentication=True,
         device_model="Unofficial Telegram MCP",
-        app_version="0.2.1",
+        app_version="0.2.2",
     )
     try:
         await client.connect()

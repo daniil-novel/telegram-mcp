@@ -1,0 +1,35 @@
+Unofficial Telegram MCP
+Copyright (c) 2026 daniil-novel
+
+Project code: standard MIT license. The complete license is in LICENSE.
+Keep its copyright and permission notices in copies or substantial portions.
+This notice explains attribution and platform boundaries; it adds no license
+condition, forced UI credit or automatic whole-application MIT requirement.
+
+This independent project uses documented Telegram MTProto operations through
+the third-party Telethon library. It is not endorsed by Telegram or OpenAI.
+Dependencies and Telegram website artwork retain their own rights/licenses;
+see THIRD_PARTY_NOTICES.md. No right to Telegram trademarks,
+third-party chat content or an exception to platform rules is granted here.
+Technical MCP compatibility is not authorization for a particular AI use.
+Current terms and unresolved client obligations are discussed in
+https://github.com/daniil-novel/telegram-mcp/blob/main/docs/licensing.md and
+https://github.com/daniil-novel/telegram-mcp/blob/main/docs/licensing.ru.md.
+MIT does not prevent third-party
+claims or guarantee platform approval.
+
+Русский
+
+Код проекта использует стандартную MIT; полный текст находится в LICENSE.
+В копиях или существенных частях сохраняйте уведомления об авторском праве
+и разрешении. NOTICE не добавляет условий, обязательного кредита в интерфейсе
+или требования переводить целое приложение на MIT.
+
+Независимый проект использует документированные Telegram MTProto-операции
+через стороннюю Telethon и не одобрен Telegram или OpenAI. У зависимостей свои
+лицензии, а материалы сайта Telegram сохраняют свои права; см.
+THIRD_PARTY_NOTICES.md. Права на товарные знаки, чужую переписку и исключения из правил
+платформы этим документом не предоставляются. Совместимость MCP не разрешает
+любой ИИ-сценарий. Текущие условия и нерешённые клиентские требования описаны
+в docs/licensing.md и docs/licensing.ru.md. MIT не исключает сторонних
+претензий и не гарантирует одобрения платформы.
