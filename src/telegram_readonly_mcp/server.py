@@ -6,11 +6,15 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
+from pydantic import ValidationError
 
 from .backend import Backend, DemoBackend, TelegramBackend
 from .config import Settings
+from .exceptions import PublicError
+from .guard import ReadOnlyViolation
 from .models import (
     AcrossInput,
     BetweenInput,
@@ -53,6 +57,24 @@ WRITE_INSTRUCTIONS = (
 )
 
 
+class TelegramMCP(FastMCP):
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        """SDK validation errors include raw inputs; only expose intentional diagnostics."""
+        try:
+            return await super().call_tool(name, arguments)
+        except ToolError as exc:
+            if isinstance(exc.__cause__, (PublicError, ReadOnlyViolation)):
+                raise ToolError(str(exc.__cause__)) from None
+            if isinstance(exc.__cause__, ValidationError):
+                raise ToolError(
+                    "Invalid tool parameters. Check the tool schema, numeric IDs and size limits."
+                ) from None
+            raise ToolError(
+                "Tool execution failed. Check the tool name and parameters; "
+                "inspect the targeted chat before retrying a write."
+            ) from None
+
+
 def create_server(
     settings: Settings, *, demo: bool = False, backend: Backend | None = None
 ) -> tuple[FastMCP, ReadService]:
@@ -80,13 +102,13 @@ def create_server(
                             await service.backend.close()
                             service.opened = False
 
-    mcp = FastMCP(
+    mcp = TelegramMCP(
         "telegram_readonly_mcp",
         instructions=WRITE_INSTRUCTIONS if settings.write_enabled else INSTRUCTIONS,
         lifespan=lifespan,
         json_response=True,
         stateless_http=True,
-        log_level="ERROR",
+        log_level="CRITICAL",
         max_request_body_size=65536,
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
@@ -168,8 +190,8 @@ def create_server(
             return await service.execute("delete_messages", params)
 
     # Exact tool inventory is also asserted by the test suite.
-    assert len(READ_TOOLS) == 7
-    assert len(WRITE_TOOLS) == 3
+    if len(READ_TOOLS) != 7 or len(WRITE_TOOLS) != 3:
+        raise RuntimeError("Unexpected Telegram tool inventory.")
     return mcp, service
 
 
@@ -193,7 +215,7 @@ class BearerAuth:
 
     def __init__(self, app: Any, token: str):
         if len(token) < 32 or not token.isascii() or any(c.isspace() for c in token):
-            raise ValueError(
+            raise PublicError(
                 "HTTP requires a random ASCII MCP_HTTP_TOKEN of at least 32 characters."
             )
         self.app = app
@@ -218,4 +240,15 @@ class BearerAuth:
                 )
                 await send({"type": "http.response.body", "body": b'{"error":"unauthorized"}'})
                 return
-        await self.app(scope, receive, send)
+
+        async def private_send(message: dict[str, Any]) -> None:
+            if message["type"] == "http.response.start":
+                headers = [
+                    (key, value)
+                    for key, value in message.get("headers", [])
+                    if key.lower() != b"cache-control"
+                ]
+                message = {**message, "headers": [*headers, (b"cache-control", b"no-store")]}
+            await send(message)
+
+        await self.app(scope, receive, private_send if scope["type"] == "http" else send)

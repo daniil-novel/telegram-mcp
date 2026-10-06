@@ -1,6 +1,6 @@
 {
   "name": "telegram-readonly-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Unofficial Telegram MCP for Codex. Read-only by default, optional sends/edits/deletions in explicitly allowed chats. Local authorization; no background notifications.",
   "author": {
     "name": "daniil-novel"

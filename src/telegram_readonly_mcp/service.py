@@ -13,7 +13,8 @@ from telethon import errors
 
 from .backend import Backend
 from .config import Settings
-from .guard import ReadOnlyViolation, require_write_chat
+from .exceptions import PublicError
+from .guard import ReadOnlyViolation, require_read_chat, require_write_chat
 from .models import (
     AcrossInput,
     BetweenInput,
@@ -42,6 +43,15 @@ READ_TOOLS = frozenset(
         "messages_between",
     }
 )
+READ_INPUTS = {
+    "list_dialogs": DialogsInput,
+    "get_chat_history": HistoryInput,
+    "get_message": MessageInput,
+    "search_messages": SearchInput,
+    "get_unread_messages": AcrossInput,
+    "get_latest_messages": AcrossInput,
+    "messages_between": BetweenInput,
+}
 WRITE_INPUTS = {
     "send_message": SendMessageInput,
     "edit_message": EditMessageInput,
@@ -64,13 +74,16 @@ class ReadService:
         )
 
     def require_chat(self, chat_id: int) -> None:
-        if not self.allowed(chat_id):
-            raise ReadOnlyViolation("Chat is denied by the local read ACL.")
+        require_read_chat(self.settings, chat_id)
 
     async def dialogs(self) -> list[Dialog]:
-        return sorted(
-            (d for d in await self.backend.dialogs() if self.allowed(d.id)), key=lambda d: d.id
-        )
+        records = []
+        for dialog in await self.backend.dialogs():
+            if self.allowed(dialog.id):
+                if dialog.latest is not None and dialog.latest.chat_id != dialog.id:
+                    dialog = dialog.model_copy(update={"latest": None})
+                records.append(dialog)
+        return sorted(records, key=lambda d: d.id)
 
     async def require_dialog(self, chat_id: int) -> Dialog:
         self.require_chat(chat_id)  # Reject before fetching anything from Telegram.
@@ -78,7 +91,7 @@ class ReadService:
 
     @staticmethod
     def _missing() -> Any:
-        raise ValueError("Chat is not in the current dialog list; use list_dialogs first.")
+        raise PublicError("Chat is not in the current dialog list; use list_dialogs first.")
 
     def _binding(self, operation: str, params: Any) -> str:
         config = params.model_dump(mode="json", exclude={"cursor", "limit"})
@@ -110,7 +123,7 @@ class ReadService:
                 raise ValueError
             return state
         except (ValueError, KeyError, TypeError):
-            raise ValueError(
+            raise PublicError(
                 "Invalid/expired cursor or changed query/ACL. Restart without cursor."
             ) from None
 
@@ -130,12 +143,17 @@ class ReadService:
                 raise ReadOnlyViolation("Write tools are disabled by local configuration.")
             expected = WRITE_INPUTS[operation]
             if type(params) is not expected:
-                raise ValueError("Use the exact input model for the requested write tool.")
+                raise PublicError("Use the exact input model for the requested write tool.")
             # Revalidate even a constructed/copied Python model before side effects.
             params = expected.model_validate(params.model_dump(warnings=False))
             require_write_chat(self.settings, params.chat_id)
         elif operation not in READ_TOOLS:
             raise ReadOnlyViolation("Only the seven fixed read tools are allowed.")
+        else:
+            expected = READ_INPUTS[operation]
+            if type(params) is not expected:
+                raise PublicError("Use the exact input model for the requested read tool.")
+            params = expected.model_validate(params.model_dump(warnings=False))
         try:
             async with asyncio.timeout(self.settings.timeout_seconds), self.lock:
                 chat_id = getattr(params, "chat_id", None)
@@ -146,35 +164,35 @@ class ReadService:
                     self.opened = True
                 return await getattr(self, operation)(params)
         except errors.FloodWaitError as exc:
-            raise ValueError(f"Telegram rate limit. Retry after {exc.seconds} seconds.") from None
+            raise PublicError(f"Telegram rate limit. Retry after {exc.seconds} seconds.") from None
         except (errors.UnauthorizedError, errors.AuthKeyError):
-            raise ValueError(
+            raise PublicError(
                 "Telegram session expired/revoked. Run 'auth' in your terminal."
             ) from None
         except (errors.ServerError, errors.TimedOutError):
-            raise ValueError(
+            raise PublicError(
                 "Write outcome is unknown after a Telegram server error; it may have completed. "
                 "Read the targeted chat before retrying."
                 if writing
                 else "Telegram could not complete the read request. Retry this page later."
             ) from None
         except errors.RPCError:
-            raise ValueError(
+            raise PublicError(
                 "Telegram rejected the write request. Check message ownership and chat permissions."
                 if writing
                 else "Telegram rejected the read request. Check access and retry later."
             ) from None
-        except (ReadOnlyViolation, ValueError):
+        except (ReadOnlyViolation, PublicError):
             raise
         except (OSError, TimeoutError):
-            raise ValueError(
+            raise PublicError(
                 "Write outcome is unknown; it may have completed. "
                 "Read the targeted chat before retrying."
                 if writing
                 else "Read timed out or connection failed. Retry this page later."
             ) from None
         except Exception:
-            raise ValueError(
+            raise PublicError(
                 "Write outcome could not be confirmed. Inspect the targeted chat before retrying."
                 if writing
                 else "Read failed safely; no Telegram write operation was performed."
@@ -187,7 +205,7 @@ class ReadService:
     async def _write_message(self, chat_id: int, message_id: int, *, own: bool) -> Any:
         message = await self.backend.message(chat_id, message_id)
         if message is None or message.chat_id != chat_id or message.id != message_id:
-            raise ValueError("Message does not exist in the specified chat.")
+            raise PublicError("Message does not exist in the specified chat.")
         if own and (not message.outgoing or message.service_action):
             raise ReadOnlyViolation("Only your own outgoing non-service messages can be changed.")
         return message
@@ -204,14 +222,14 @@ class ReadService:
         await self._write_dialog(params.chat_id)
         previous = await self._write_message(params.chat_id, params.message_id, own=True)
         if previous.media_type:
-            raise ValueError("Only plain-text messages can be edited through this tool.")
+            raise PublicError("Only plain-text messages can be edited through this tool.")
         return await self.backend.edit_message(params)
 
     async def delete_messages(self, params: DeleteMessagesInput) -> DeleteMessagesResult:
         params = DeleteMessagesInput.model_validate(params.model_dump(warnings=False))
         await self._write_dialog(params.chat_id)
         if params.chat_id <= -1000000000000 and not params.revoke:
-            raise ValueError("Channels/megagroups always delete for everyone; use revoke=true.")
+            raise PublicError("Channels/megagroups always delete for everyone; use revoke=true.")
         for message_id in params.message_ids:
             await self._write_message(params.chat_id, message_id, own=True)
         return await self.backend.delete_messages(params)
@@ -239,6 +257,7 @@ class ReadService:
         records = await self.backend.messages(
             params.chat_id, limit=params.limit + 1, before_id=params.before_id
         )
+        records = [m for m in records if m.chat_id == params.chat_id]
         items = records[: params.limit]
         more = len(records) > params.limit
         return self._page(
@@ -251,11 +270,15 @@ class ReadService:
     async def get_message(self, params: MessageInput) -> MessageResult:
         await self.require_dialog(params.chat_id)
         message = await self.backend.message(params.chat_id, params.message_id)
+        if message is not None and (
+            message.chat_id != params.chat_id or message.id != params.message_id
+        ):
+            message = None
         return MessageResult(message=message, source=self.backend.source)
 
     async def messages_between(self, params: BetweenInput) -> Page:
         if params.start >= params.end:
-            raise ValueError("start must precede end; interval is [start, end).")
+            raise PublicError("start must precede end; interval is [start, end).")
         await self.require_dialog(params.chat_id)
         records = await self.backend.messages(
             params.chat_id,
@@ -264,6 +287,7 @@ class ReadService:
             start=params.start,
             end=params.end,
         )
+        records = [m for m in records if m.chat_id == params.chat_id]
         items = records[: params.limit]
         more = len(records) > params.limit
         return self._page(
@@ -316,6 +340,7 @@ class ReadService:
                 min_id=dialog.read_inbox_max_id if unread else 0,
                 query=params.query if isinstance(params, SearchInput) else None,
             )
+            records = [m for m in records if m.chat_id == dialog.id]
             consumed = records[:budget]
             items.extend(m for m in consumed if not unread or not m.outgoing)
             more_in_chat = len(records) > budget and (

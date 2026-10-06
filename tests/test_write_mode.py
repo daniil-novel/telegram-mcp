@@ -398,10 +398,12 @@ async def test_guards_both_rpc_boundaries_and_scoped_request_identity(rpc_backen
         copied = functions.messages.SendMessageRequest(
             peer=backend.peers[101],
             message="synthetic",
+            random_id=request.random_id,
             no_webpage=True,
             silent=True,
             entities=[],
         )
+        assert bytes(copied) == bytes(request)
         with pytest.raises(ReadOnlyViolation):
             client._sender.send(copied)
         request.message = "changed after approval"

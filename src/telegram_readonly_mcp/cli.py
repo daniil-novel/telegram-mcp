@@ -12,7 +12,8 @@ from telethon import errors
 from telethon.sessions import StringSession
 
 from .config import Settings, load_settings
-from .guard import GuardedTelegramClient
+from .exceptions import PublicError
+from .guard import GuardedTelegramClient, ReadOnlyViolation
 from .security import SessionStore, protect_path
 from .server import create_http_app, create_server
 
@@ -25,7 +26,7 @@ def hidden_input(prompt: str, *, strip: bool = True) -> str:
             value = getpass.getpass(prompt)
             return value.strip() if strip else value
         except getpass.GetPassWarning:
-            raise ValueError(
+            raise PublicError(
                 "Use an interactive terminal; secret input must not be echoed."
             ) from None
 
@@ -38,13 +39,13 @@ def required_hidden_input(prompt: str, *, strip: bool = True) -> str:
         print(
             "Nothing entered. Input is hidden; type the value, then press Enter.", file=sys.stderr
         )
-    raise ValueError("No value entered. Restart auth yourself in your terminal.")
+    raise PublicError("No value entered. Restart auth yourself in your terminal.")
 
 
 async def authorize(settings: Settings) -> None:
     settings.require_credentials()
     if not sys.stdin.isatty():
-        raise ValueError("Run auth yourself in an interactive terminal, not through an MCP tool.")
+        raise PublicError("Run auth yourself in an interactive terminal, not through an MCP tool.")
     store = SessionStore(settings.session_dir)
     session = StringSession(store.load()) if store.path.exists() else StringSession()
     client = GuardedTelegramClient(
@@ -53,7 +54,7 @@ async def authorize(settings: Settings) -> None:
         settings.api_hash.get_secret_value(),
         authentication=True,
         device_model="Unofficial Telegram MCP",
-        app_version="0.2.0",
+        app_version="0.2.1",
     )
     try:
         await client.connect()
@@ -67,7 +68,7 @@ async def authorize(settings: Settings) -> None:
                     break
                 except errors.PhoneCodeInvalidError:
                     if attempt == 2:
-                        raise ValueError("Invalid login code. Restart auth yourself.") from None
+                        raise PublicError("Invalid login code. Restart auth yourself.") from None
                     print("Invalid code; try again.", file=sys.stderr)
                 except errors.SessionPasswordNeededError:
                     for password_attempt in range(3):
@@ -79,7 +80,7 @@ async def authorize(settings: Settings) -> None:
                             break
                         except errors.PasswordHashInvalidError:
                             if password_attempt == 2:
-                                raise ValueError(
+                                raise PublicError(
                                     "Invalid 2FA password. Restart auth yourself."
                                 ) from None
                             print("Invalid 2FA password; try again.", file=sys.stderr)
@@ -88,7 +89,7 @@ async def authorize(settings: Settings) -> None:
                     break
         me = await client.get_me()
         if me is None or me.bot:
-            raise ValueError("Authorization requires a personal account, not a bot.")
+            raise PublicError("Authorization requires a personal account, not a bot.")
         store.save(client.session.save())
         print("Authorized. Session stored locally; no messages were read or changed.")
     finally:
@@ -103,7 +104,8 @@ def main() -> None:
     sub.add_parser("protect-env", help="Restrict .env file permissions to your account")
     serve = sub.add_parser("serve", help="Start MCP (write tools require explicit configuration)")
     serve.add_argument("--transport", choices=("stdio", "http"), default="stdio")
-    serve.add_argument("--host", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1")
+    # Remote/Docker binding is explicit; default stays loopback with bearer/Host/Origin guards.
+    serve.add_argument("--host", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1")  # nosec B104
     serve.add_argument("--port", type=int, default=8765)
     serve.add_argument(
         "--demo", action="store_true", help="Synthetic data only; no Telegram connection"
@@ -114,7 +116,7 @@ def main() -> None:
         if args.action == "protect-env":
             path = args.env_file or Path.cwd() / ".env"
             if not path.is_file():
-                raise ValueError("Create your local .env from .env.example first.")
+                raise PublicError("Create your local .env from .env.example first.")
             protect_path(path)
             print("Local .env permissions restricted.")
             return
@@ -141,7 +143,7 @@ def main() -> None:
             file=sys.stderr,
         )
         raise SystemExit(1) from None
-    except (ValueError, PermissionError) as exc:
+    except (PublicError, ReadOnlyViolation) as exc:
         print(str(exc), file=sys.stderr)
         raise SystemExit(1) from None
     except Exception:

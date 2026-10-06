@@ -2,6 +2,13 @@
 
 **English** · [Русский](README.ru.md)
 
+[![CI](https://github.com/daniil-novel/telegram-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/daniil-novel/telegram-mcp/actions/workflows/ci.yml)
+[![Security checks](https://github.com/daniil-novel/telegram-mcp/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/daniil-novel/telegram-mcp/actions/workflows/security.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![MIT license](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
+
+**[Setup](#1-install-windows-linux-macos) · [Read tools](#6-read-telegram) · [Optional writes](#7-enable-writes) · [Contribute](CONTRIBUTING.md) · [Security model](docs/security.md)**
+
 A local [Model Context Protocol](https://modelcontextprotocol.io/) server for your Telegram cloud chats, built for **Codex** and other compatible MCP clients. Find dialogs, search messages, read history and unread messages, and summarize a chosen period through Telegram's MTProto API.
 
 **Read-only by default.** Optionally enable sending text, editing your own messages and deleting your own messages in explicitly allowed chats. No background monitoring or desktop notification sender.
@@ -23,6 +30,7 @@ An independent community project, not affiliated with Telegram or OpenAI. Uses y
 - [Notifications](#notifications)
 - [Troubleshooting](#troubleshooting)
 - [Updates and development](#updates-and-development)
+- [Contribute and support](#contribute-and-support)
 - [Planned privacy layer](#planned-privacy-layer)
 - [Advanced use and license](#advanced-use-and-license)
 
@@ -429,7 +437,7 @@ ACL filters MCP output and targeted history requests. Telegram's dialog listing 
 
 Review [Telegram API Terms](https://core.telegram.org/api/terms) and [Content Licensing and AI Scraping Terms](https://telegram.org/tos/content-licensing). The API terms broadly restrict platform-data use for AI development, enhancement or deployment. Technical MCP compatibility is not a claim that Telegram authorizes a particular AI use. MIT licenses this code, not Telegram content or exceptions to platform terms.
 
-See [SECURITY.md](SECURITY.md) for security reporting and revocation.
+Read the [security model and its limits](docs/security.md): repository rules, Bandit, dependency/secret scans and CodeQL. [SECURITY.md](SECURITY.md) covers private vulnerability reporting and revocation. Checks reduce known risks; permitted content remains visible to the client/model, and prompt injection is not fully solved.
 
 ## Notifications
 
@@ -486,6 +494,12 @@ uv build
 ```
 
 Tests use synthetic/fake responses; passing tests does not establish live testing of every Telegram account/OS/Docker environment. Recorded evidence/limits: [VALIDATION.md](VALIDATION.md). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+
+## Contribute and support
+
+Bug reports, documentation fixes and focused improvements are welcome in English or Russian. **Fork → feature branch → pull request to `main`**; see [CONTRIBUTING.md](CONTRIBUTING.md) for exact commands and account-free checks. A public fork gives you no write access to this repository. Report vulnerabilities through [SECURITY.md](SECURITY.md), using synthetic examples.
+
+If this project is useful to you, give it a [⭐ star on GitHub](https://github.com/daniil-novel/telegram-mcp). It helps other people discover the tool.
 
 ## Planned privacy layer
 
