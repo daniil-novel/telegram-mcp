@@ -5,11 +5,21 @@ import re
 from pathlib import Path
 
 from dotenv import dotenv_values
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, StrictBool, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    StrictBool,
+    ValidationInfo,
+    field_validator,
+)
+
+from .exceptions import PublicError
 
 
 class Settings(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, hide_input_in_errors=True)
     api_id: int = Field(default=0, ge=0)
     api_hash: SecretStr = SecretStr("")
     session_dir: Path
@@ -23,51 +33,55 @@ class Settings(BaseModel):
     timeout_seconds: int = 45
     scan_chats: int = 20
 
-    @field_validator("write_allow_ids", mode="before")
+    @field_validator("allow_ids", "deny_ids", "write_allow_ids", mode="before")
     @classmethod
-    def exact_write_ids(cls, value: object) -> object:
+    def exact_acl_ids(cls, value: object, info: ValidationInfo) -> object:
+        if value is None and info.field_name == "allow_ids":
+            return value
         if not isinstance(value, (set, frozenset, list, tuple)) or any(
             type(item) is not int or item == 0 or not -(2**63) < item < 2**63 for item in value
         ):
-            raise ValueError("Write ACL must contain exact nonzero numeric chat IDs.")
+            raise PublicError("ACL must contain exact nonzero numeric chat IDs.")
         return value
 
     def require_credentials(self) -> None:
         if not self.api_id or not re.fullmatch(
             r"[0-9a-fA-F]{32}", self.api_hash.get_secret_value()
         ):
-            raise ValueError("Fill TELEGRAM_API_ID and TELEGRAM_API_HASH in your local .env first.")
+            raise PublicError(
+                "Fill TELEGRAM_API_ID and TELEGRAM_API_HASH in your local .env first."
+            )
 
 
 def _ids(value: str, *, allow_wildcard: bool = False) -> frozenset[int] | None:
     if value.strip() == "*" and allow_wildcard:
         return None
-    try:
-        result = frozenset(int(item.strip()) for item in value.split(",") if item.strip())
-    except ValueError:
-        raise ValueError(
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    if any(not re.fullmatch(r"-?[1-9][0-9]*", item) for item in items):
+        raise PublicError(
             "ACL must contain marked numeric chat IDs or '*' for allowed IDs."
         ) from None
-    if 0 in result:
-        raise ValueError("Chat ID 0 is invalid.")
+    result = frozenset(int(item) for item in items)
+    if any(not -(2**63) < item < 2**63 for item in result):
+        raise PublicError("Chat IDs must fit in a signed 64-bit integer.")
     return result
 
 
 def _write_ids(value: str) -> frozenset[int]:
     items = [item.strip() for item in value.split(",") if item.strip()]
     if any(not re.fullmatch(r"-?[1-9][0-9]*", item) for item in items):
-        raise ValueError(
+        raise PublicError(
             "TELEGRAM_WRITE_ALLOWED_CHAT_IDS needs exact numeric IDs; '*' is forbidden."
         )
     result = frozenset(int(item) for item in items)
     if any(not -(2**63) < item < 2**63 for item in result):
-        raise ValueError("Write chat IDs must fit in a signed 64-bit integer.")
+        raise PublicError("Write chat IDs must fit in a signed 64-bit integer.")
     return result
 
 
 def _write_enabled(value: str) -> bool:
     if value.strip().lower() not in {"true", "false"}:
-        raise ValueError("TELEGRAM_WRITE_ENABLED must be true or false.")
+        raise PublicError("TELEGRAM_WRITE_ENABLED must be true or false.")
     return value.strip().lower() == "true"
 
 
@@ -90,7 +104,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
     try:
         api_id = int(value("TELEGRAM_API_ID", "0"))
     except ValueError:
-        raise ValueError("TELEGRAM_API_ID must be an integer.") from None
+        raise PublicError("TELEGRAM_API_ID must be an integer.") from None
     hosts = tuple(
         x.strip() for x in value("MCP_ALLOWED_HOSTS", "127.0.0.1:8765,localhost:8765").split(",")
     )
@@ -101,7 +115,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
         )
     )
     if any(not item or "*" in item for item in (*hosts, *origins)):
-        raise ValueError("HTTP hosts/origins must be explicit; wildcards are forbidden.")
+        raise PublicError("HTTP hosts/origins must be explicit; wildcards are forbidden.")
     return Settings(
         api_id=api_id,
         api_hash=SecretStr(value("TELEGRAM_API_HASH")),

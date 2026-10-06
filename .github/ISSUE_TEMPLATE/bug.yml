@@ -1,0 +1,23 @@
+name: Bug report / Ошибка
+description: Report a reproducible bug using synthetic data only.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English / Русский welcome. Never paste API hashes, tokens, session files, phone numbers or private messages.
+        Не публикуйте секреты, файлы сессии, номера телефона или личную переписку.
+        For vulnerabilities use the private report link instead.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior / Ожидаемое и фактическое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction with synthetic data / Воспроизведение на вымышленных данных
+      description: Include OS, Python/uv versions and sanitized errors.
+    validations:
+      required: true

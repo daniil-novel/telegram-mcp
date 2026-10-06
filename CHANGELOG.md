@@ -4,6 +4,22 @@ User-visible changes are recorded here. Entries under Unreleased are prepared ch
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-06
+
+### Security
+
+- Redact unexpected backend, schema and startup errors so submitted values and library diagnostics do not escape through MCP or startup output.
+- Normalize session paths and reject dangling links before storage; retain private local storage and platform-specific session protection.
+- Validate exact read IDs and limits again at execution, check cached/returned Telegram peers and suppress mismatched message metadata.
+- Enforce runtime checks even under optimized Python and send HTTP responses with `Cache-Control: no-store`.
+- Add adversarial account-free regression coverage and pinned Bandit, dependency, secret, workflow and CodeQL checks for pull requests.
+
+### Community
+
+- Document fork-based contributions and designated-maintainer review. Add CODEOWNERS, issue/PR templates and weekly Dependabot updates.
+- Protect main through separate mandatory-check and review rules; the owner can waive a second review only through a PR, without waiving core checks.
+- Improve both READMEs with navigation, status badges, a security model and an optional star request.
+
 ### Documentation
 
 - Propose a local privacy filter with encrypted local storage, data minimization,

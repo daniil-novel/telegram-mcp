@@ -5,6 +5,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+ChatId = Annotated[int, Field(strict=True, gt=-(2**63), lt=2**63)]
+MessageId = Annotated[int, Field(strict=True, gt=0, le=2**31 - 1)]
+
 
 class Message(BaseModel):
     id: int
@@ -31,11 +34,22 @@ class Dialog(BaseModel):
 
 
 class Input(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, frozen=True, hide_input_in_errors=True
+    )
+
+    @field_validator("chat_id", check_fields=False)
+    @classmethod
+    def nonzero_chat_id(cls, value: int | None) -> int | None:
+        if value == 0:
+            raise ValueError("Chat ID 0 is invalid.")
+        return value
 
 
 class PageInput(Input):
-    limit: int = Field(default=50, ge=1, le=200, description="Maximum records on this page.")
+    limit: int = Field(
+        default=50, strict=True, ge=1, le=200, description="Maximum records on this page."
+    )
     cursor: str | None = Field(
         default=None, max_length=4096, description="Opaque continuation from previous page."
     )
@@ -48,29 +62,34 @@ class DialogsInput(PageInput):
 
 
 class HistoryInput(Input):
-    chat_id: int = Field(description="Marked numeric chat ID returned by list_dialogs.")
-    limit: int = Field(default=50, ge=1, le=200)
+    chat_id: ChatId = Field(description="Marked numeric chat ID returned by list_dialogs.")
+    limit: int = Field(default=50, strict=True, ge=1, le=200)
     before_id: int = Field(
-        default=0, ge=0, description="Exclusive older-than message ID; 0 starts at latest."
+        default=0,
+        strict=True,
+        ge=0,
+        le=2**31 - 1,
+        description="Exclusive older-than message ID; 0 starts at latest.",
     )
 
 
 class MessageInput(Input):
-    chat_id: int
-    message_id: int = Field(gt=0)
+    chat_id: ChatId
+    message_id: MessageId
 
 
 class SearchInput(PageInput):
     query: str = Field(min_length=1, max_length=256, description="Telegram text search query.")
-    chat_id: int | None = Field(
+    chat_id: ChatId | None = Field(
         default=None, description="Omit to search across all allowed dialogs."
     )
 
 
 class AcrossInput(PageInput):
-    chat_id: int | None = Field(default=None, description="Omit to walk all allowed dialogs.")
+    chat_id: ChatId | None = Field(default=None, description="Omit to walk all allowed dialogs.")
     per_chat_limit: int = Field(
         default=10,
+        strict=True,
         ge=1,
         le=200,
         description="Recent messages per dialog for get_latest_messages only.",
@@ -110,13 +129,9 @@ class MessageResult(BaseModel):
     content_is_untrusted: bool = True
 
 
-ChatId = Annotated[int, Field(strict=True, gt=-(2**63), lt=2**63)]
-MessageId = Annotated[int, Field(strict=True, gt=0, le=2**31 - 1)]
-
-
 class WriteInput(BaseModel):
     # Literal text must retain leading/trailing whitespace. No coercion of IDs or booleans.
-    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True, hide_input_in_errors=True)
     chat_id: ChatId
 
     @field_validator("chat_id")

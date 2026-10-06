@@ -7,7 +7,8 @@ from telethon import functions, types, utils
 from telethon.sessions import StringSession
 
 from .config import Settings
-from .guard import GuardedTelegramClient, ReadOnlyViolation, require_write_chat
+from .exceptions import PublicError
+from .guard import GuardedTelegramClient, ReadOnlyViolation, require_read_chat, require_write_chat
 from .models import (
     DeleteMessagesInput,
     DeleteMessagesResult,
@@ -44,7 +45,12 @@ class Backend(Protocol):
 
 
 def serialize_message(item: object, chat_id: int) -> Message | None:
-    if isinstance(item, types.MessageEmpty) or not getattr(item, "date", None):
+    if (
+        type(item) not in {types.Message, types.MessageService}
+        or not item.date
+        or type(item.peer_id) not in {types.PeerUser, types.PeerChat, types.PeerChannel}
+        or utils.get_peer_id(item.peer_id) != chat_id
+    ):
         return None
     text = getattr(item, "message", "") or ""
     reply = getattr(item, "reply_to", None)
@@ -83,15 +89,15 @@ class TelegramBackend:
             self.settings.api_hash.get_secret_value(),
             write_settings=self.settings,
             device_model="Unofficial Telegram MCP",
-            app_version="0.2.0",
+            app_version="0.2.1",
         )
         try:
             await self.client.connect()
             if not await self.client.is_user_authorized():
-                raise ValueError("Telegram session expired. Run 'auth' locally again.")
+                raise PublicError("Telegram session expired. Run 'auth' locally again.")
             me = await self.client.get_me()
             if me is None or me.bot:
-                raise ValueError("A personal Telegram account session is required, not a bot.")
+                raise PublicError("A personal Telegram account session is required, not a bot.")
             self.self_peer = utils.get_input_peer(me, allow_self=False)
         except BaseException:
             await self.close()
@@ -100,13 +106,25 @@ class TelegramBackend:
     async def close(self) -> None:
         if self.client is not None:
             await self.client.disconnect()
+            self.client = None
+            self.self_peer = None
+            self.peers = {}
+
+    def _client(self) -> GuardedTelegramClient:
+        if self.client is None:
+            raise PublicError("Telegram backend is not open; retry after reconnecting locally.")
+        return self.client
 
     async def dialogs(self) -> list[Dialog]:
-        assert self.client is not None
+        client = self._client()
         records = []
         peers = {}
         # All folders including archived. This reads metadata; never acknowledges history.
-        async for dialog in self.client.iter_dialogs(limit=None, ignore_migrated=False):
+        async for dialog in client.iter_dialogs(limit=None, ignore_migrated=False):
+            if dialog.id in self.settings.deny_ids or (
+                self.settings.allow_ids is not None and dialog.id not in self.settings.allow_ids
+            ):
+                continue
             peers[dialog.id] = dialog.input_entity
             records.append(
                 Dialog(
@@ -125,13 +143,24 @@ class TelegramBackend:
         return records
 
     def _peer(self, chat_id: int) -> object:
+        require_read_chat(self.settings, chat_id)
         if chat_id not in self.peers:
-            raise ValueError("Chat is not in the current account's dialog list.")
+            raise PublicError("Chat is not in the current account's dialog list.")
         peer = self.peers[chat_id]
         if type(peer) is types.InputPeerSelf:
             if self.self_peer is None or self.self_peer.user_id != chat_id:
-                raise ValueError("Saved Messages identity is not available; reconnect locally.")
+                raise PublicError("Saved Messages identity is not available; reconnect locally.")
             return self.self_peer
+        if (
+            type(peer)
+            not in {
+                types.InputPeerUser,
+                types.InputPeerChat,
+                types.InputPeerChannel,
+            }
+            or utils.get_peer_id(peer) != chat_id
+        ):
+            raise PublicError("Cached Telegram peer does not match the requested chat.")
         return peer
 
     async def messages(
@@ -145,9 +174,9 @@ class TelegramBackend:
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> list[Message]:
-        assert self.client is not None
+        client = self._client()
         result = []
-        async for item in self.client.iter_messages(
+        async for item in client.iter_messages(
             self._peer(chat_id),
             limit=limit,
             offset_id=before_id,
@@ -166,8 +195,8 @@ class TelegramBackend:
         return result
 
     async def message(self, chat_id: int, message_id: int) -> Message | None:
-        assert self.client is not None
-        item = await self.client.get_messages(self._peer(chat_id), ids=message_id)
+        client = self._client()
+        item = await client.get_messages(self._peer(chat_id), ids=message_id)
         # Nonchannel getMessages ignores the peer argument. Never let IDs address another chat.
         if (
             not item
@@ -181,7 +210,7 @@ class TelegramBackend:
     async def _existing_message(self, chat_id: int, message_id: int, *, own: bool) -> Message:
         message = await self.message(chat_id, message_id)
         if message is None:
-            raise ValueError("Message does not exist in the specified chat.")
+            raise PublicError("Message does not exist in the specified chat.")
         if own and (not message.outgoing or message.service_action):
             raise ReadOnlyViolation("Only your own outgoing non-service messages can be changed.")
         return message
@@ -228,7 +257,7 @@ class TelegramBackend:
     async def send_message(self, params: SendMessageInput) -> WriteMessageResult:
         params = SendMessageInput.model_validate(params.model_dump(warnings=False))
         require_write_chat(self.settings, params.chat_id)
-        assert self.client is not None
+        client = self._client()
         peer = self._peer(params.chat_id)
         if params.reply_to_message_id is not None:
             await self._existing_message(params.chat_id, params.reply_to_message_id, own=False)
@@ -242,8 +271,8 @@ class TelegramBackend:
             else None,
             entities=[],
         )
-        with self.client.authorize_write(request, params.chat_id):
-            response = await self.client(request)
+        with client.authorize_write(request, params.chat_id):
+            response = await client(request)
         return WriteMessageResult(
             operation="send_message",
             chat_id=params.chat_id,
@@ -254,11 +283,11 @@ class TelegramBackend:
     async def edit_message(self, params: EditMessageInput) -> WriteMessageResult:
         params = EditMessageInput.model_validate(params.model_dump(warnings=False))
         require_write_chat(self.settings, params.chat_id)
-        assert self.client is not None
+        client = self._client()
         peer = self._peer(params.chat_id)
         previous = await self._existing_message(params.chat_id, params.message_id, own=True)
         if previous.media_type:
-            raise ValueError("Only plain-text messages can be edited through this tool.")
+            raise PublicError("Only plain-text messages can be edited through this tool.")
         request = functions.messages.EditMessageRequest(
             peer=peer,
             id=params.message_id,
@@ -266,8 +295,8 @@ class TelegramBackend:
             no_webpage=True,
             entities=[],
         )
-        with self.client.authorize_write(request, params.chat_id):
-            response = await self.client(request)
+        with client.authorize_write(request, params.chat_id):
+            response = await client(request)
         return WriteMessageResult(
             operation="edit_message",
             chat_id=params.chat_id,
@@ -278,10 +307,10 @@ class TelegramBackend:
     async def delete_messages(self, params: DeleteMessagesInput) -> DeleteMessagesResult:
         params = DeleteMessagesInput.model_validate(params.model_dump(warnings=False))
         require_write_chat(self.settings, params.chat_id)
-        assert self.client is not None
+        client = self._client()
         peer = self._peer(params.chat_id)
         if type(peer) is types.InputPeerChannel and not params.revoke:
-            raise ValueError("Channels/megagroups always delete for everyone; use revoke=true.")
+            raise PublicError("Channels/megagroups always delete for everyone; use revoke=true.")
         # Validate every requested ID before constructing a mutation; no partial batch deletion.
         for message_id in params.message_ids:
             await self._existing_message(params.chat_id, message_id, own=True)
@@ -295,8 +324,8 @@ class TelegramBackend:
                 id=list(params.message_ids), revoke=params.revoke
             )
         )
-        with self.client.authorize_write(request, params.chat_id):
-            await self.client(request)
+        with client.authorize_write(request, params.chat_id):
+            await client(request)
         return DeleteMessagesResult(
             chat_id=params.chat_id,
             requested_message_ids=params.message_ids,
@@ -410,7 +439,7 @@ class DemoBackend:
             or previous.service_action
             or previous.media_type
         ):
-            raise ValueError("Only your own outgoing plain-text messages can be edited.")
+            raise PublicError("Only your own outgoing plain-text messages can be edited.")
         item = previous.model_copy(update={"text": params.text, "edited_at": datetime.now(UTC)})
         self.data[self.data.index(previous)] = item
         return WriteMessageResult(
@@ -425,7 +454,7 @@ class DemoBackend:
             await self.message(params.chat_id, message_id) for message_id in params.message_ids
         ]
         if any(m is None or not m.outgoing or m.service_action for m in previous):
-            raise ValueError("Only your own outgoing non-service messages can be deleted.")
+            raise PublicError("Only your own outgoing non-service messages can be deleted.")
         self.data = [
             m for m in self.data if not (m.chat_id == params.chat_id and m.id in params.message_ids)
         ]

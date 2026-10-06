@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "telegram-mcp"
-version = "0.2.0"
+version = "0.2.1"
 description = "Unofficial Telegram MCP for Codex: local MTProto, read-only by default, optional writes"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=9,<10", "pytest-asyncio>=1.4,<2", "ruff>=0.16,<1", "httpx>=0.28,<1"]
+security = ["bandit==1.9.4", "pip-audit==2.10.1"]
 
 [project.scripts]
 telegram-mcp = "telegram_readonly_mcp.cli:main"

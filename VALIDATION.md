@@ -1,9 +1,59 @@
-# Validation — 0.2.0
+# Validation — 0.2.1
+
+Evidence cutoff: 2026-10-06. The 0.2.1 security changes were checked on synthetic
+data only, without accessing a real Telegram account, `.env`, or session.
+
+## Security patch checks
+
+- Windows CPython 3.11.5: **157 tests passed in 13.07 seconds**; Ruff lint/format
+  passed. The suite includes 54 adversarial hardening cases and strengthened
+  request-identity testing alongside the previous 103 cases.
+- Cases cover backend/schema/startup diagnostic redaction, strict numeric IDs
+  and copied models, chat/peer ownership, changed-ACL cursors, path traversal,
+  dangling symlinks, installed-wheel Git/worktree storage, optimized Python,
+  malicious message text, HTTP authorization/body bounds and `no-store`.
+- Bandit 1.9.4: **0 findings, 0 errors across 1719 production lines**;
+  production checks are explicit rather than removable asserts.
+  The only targeted suppression is B104 for the deliberately selectable
+  `0.0.0.0` Docker/remote bind; the default remains loopback with auth guards.
+- pip-audit 2.10.1 checked all 69 registry packages in the updated lock,
+  including runtime, development, scanner and conditional-platform packages:
+  **0 known advisories, 0 skipped packages** at the cutoff. Hash-locked export
+  auditing also passed. An advisory database is not a proof against unknown bugs.
+- actionlint 1.7.12 checked all three workflows with no diagnostics. This local
+  check did not run optional shellcheck/pyflakes; the hosted Linux check can use
+  tools present on its runner.
+- Gitleaks 8.30.1 found no secrets in the baseline working-tree archive and all
+  four prior commits with default rules and redacted output. Project rules add
+  literal Telegram API hashes and StringSession formats. Synthetic rule checks
+  validate format detection/redaction; arbitrary secrets or personal data can
+  still evade pattern-based detection.
+- The final 64-file Git-visible source snapshot and four prior commits also
+  passed default plus project secret rules: **0 findings**. Synthetic checks
+  detected all eight positive forms, accepted all seven placeholders/expressions,
+  and kept markers out of redacted diagnostics.
+- Tool binaries were downloaded from their official GitHub releases and verified
+  against SHA-256 release metadata before execution. Actions use full commit
+  pins; CI uses uv 0.12.21. Runtime/scanner dependencies use the reviewed uv lock.
+
+The new [Security](.github/workflows/security.yml) and
+[CodeQL](.github/workflows/codeql.yml) workflows configure recurring and PR
+checks. Configuration is separate from completed results: inspect checks and
+code-scanning alerts for the exact revision in
+[GitHub Actions](https://github.com/daniil-novel/telegram-mcp/actions).
+CodeQL was not executed locally. Do not interpret successful static analysis,
+unit tests or repository rules as a promise of no prompt injection, PII leakage
+through permitted message content, account compromise or unknown vulnerabilities.
+
+## Previous 0.2.0 evidence
+
+The sections below are historical results tied to the stated 0.2.0 commits;
+they do not claim that a later runtime revision is identical.
 
 Validation cutoff: 2026-10-06. All Telegram responses used in tests are synthetic.
 No real Telegram message was sent, edited, deleted, marked read or downloaded.
 
-## Completed locally
+### Completed locally
 
 - Windows, CPython 3.11.5, pinned Telethon 1.45.0 and MCP SDK 1.30.0.
 - Full suite: **103 passed in 10.83 seconds**. Includes all 41 previous tests and
@@ -19,7 +69,7 @@ No real Telegram message was sent, edited, deleted, marked read or downloaded.
   server-error write outcomes and service-message read compatibility); no
   remaining actionable blocker in the reviewed implementation.
 
-## Completed in GitHub Actions
+### Completed in GitHub Actions
 
 The [CI run 37444145637](https://github.com/daniil-novel/telegram-mcp/actions/runs/37444145637)
 completed successfully on 2026-10-06 for source commit
@@ -45,7 +95,7 @@ Docker execution. This evidence is bound to the source commit above. The later
 Windows installer migration was syntax-checked locally; its commands were not
 executed end to end. The Telegram runtime code is unchanged from that CI run.
 
-## Behavior covered
+### Behavior covered
 
 - Seven read tools by default; three write tools appear only when enabled.
 - False/default flag, empty write ACL, exact chat IDs, read ACL/deny precedence,
@@ -65,7 +115,7 @@ executed end to end. The Telegram runtime code is unchanged from that CI run.
   private session storage and local-only interactive authorization behavior.
 - MCP initialization and tool discovery do not open the Telegram connection.
 
-## Images and documentation
+### Images and documentation
 
 The login image is a real unauthenticated capture; no number/code was entered.
 The post-login images are labeled illustrations with placeholders. All images
@@ -73,7 +123,7 @@ were visually inspected. Actual personal notifications/messages and credentials
 are excluded from the repository. English and Russian READMEs provide reciprocal
 language links and OS-specific setup; image provenance is in docs/images/README.md.
 
-## Limits of the evidence
+### Limits of the evidence
 
 - Live send/edit/delete was intentionally not performed against the user's
   account. Telegram's live permissions/edit windows/rate limits still apply.

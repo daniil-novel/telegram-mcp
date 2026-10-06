@@ -1,0 +1,18 @@
+title = "Telegram MCP secret detection"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "telegram-api-hash"
+description = "A literal Telegram API hash must not be committed"
+regex = '''(?i)(?:TELEGRAM_API_HASH|api_hash)["']?\s*(?:=|:)\s*["']?([a-f0-9]{32})'''
+secretGroup = 1
+keywords = ["TELEGRAM_API_HASH", "api_hash"]
+
+[[rules]]
+id = "telegram-string-session"
+description = "A literal Telethon StringSession must not be committed"
+regex = '''(?:StringSession\(|TELEGRAM_SESSION["']?\s*(?:=|:))\s*["'](1[A-Za-z0-9_=-]{340,})["']'''
+secretGroup = 1
+keywords = ["StringSession", "TELEGRAM_SESSION"]

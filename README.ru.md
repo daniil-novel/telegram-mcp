@@ -2,6 +2,13 @@
 
 [English](README.md) · **Русский**
 
+[![CI](https://github.com/daniil-novel/telegram-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/daniil-novel/telegram-mcp/actions/workflows/ci.yml)
+[![Проверки безопасности](https://github.com/daniil-novel/telegram-mcp/actions/workflows/security.yml/badge.svg?branch=main)](https://github.com/daniil-novel/telegram-mcp/actions/workflows/security.yml)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Лицензия MIT](https://img.shields.io/badge/License-MIT-3DA639)](LICENSE)
+
+**[Установка](#1-установка-windows-linux-macos) · [Чтение](#6-чтение-telegram) · [Запись](#7-включение-записи) · [Участие](CONTRIBUTING.md#по-русски) · [Модель безопасности](docs/security.ru.md)**
+
 Локальный сервер [Model Context Protocol](https://modelcontextprotocol.io/) для ваших облачных чатов Telegram. Подготовлен для **Codex** и других совместимых MCP-клиентов: поиск диалогов и сообщений, чтение истории и непрочитанных, сводки за выбранный период через Telegram MTProto API.
 
 **По умолчанию — только чтение.** Можно отдельно разрешить отправку текста, редактирование своих сообщений и удаление своих сообщений в конкретных чатах. Фонового мониторинга и отправки уведомлений рабочего стола нет.
@@ -23,6 +30,7 @@
 - [Уведомления](#уведомления)
 - [Решение проблем](#решение-проблем)
 - [Обновление и разработка](#обновление-и-разработка)
+- [Участие и поддержка](#участие-и-поддержка)
 - [Планируемый слой приватности](#планируемый-слой-приватности)
 - [Расширенное использование и лицензия](#расширенное-использование-и-лицензия)
 
@@ -429,7 +437,7 @@ ACL фильтрует выдачу и адресные запросы исто�
 
 Изучите [Telegram API Terms](https://core.telegram.org/api/terms) и [Content Licensing and AI Scraping Terms](https://telegram.org/tos/content-licensing). API Terms широко ограничивают использование данных платформы для разработки, улучшения или развёртывания ИИ. Техническая совместимость MCP не означает, что Telegram разрешает конкретный ИИ-сценарий. MIT относится к коду, не к правам на содержимое Telegram или исключениям из правил платформы.
 
-Сообщение об уязвимости и отзыв доступа: [SECURITY.md](SECURITY.md).
+Изучите [модель безопасности и её ограничения](docs/security.ru.md): правила репозитория, Bandit, поиск уязвимых зависимостей/секретов и CodeQL. Приватные сообщения и отзыв доступа: [SECURITY.md](SECURITY.md#по-русски). Проверки снижают известные риски; разрешённая переписка видна клиенту/модели, а prompt injection полностью не решён.
 
 ## Уведомления
 
@@ -486,6 +494,12 @@ uv build
 ```
 
 Тесты используют синтетические/подставные ответы. Их прохождение не подтверждает live-проверку каждого аккаунта, ОС или Docker. Зафиксированные результаты/границы: [VALIDATION.md](VALIDATION.md). Участие: [CONTRIBUTING.md](CONTRIBUTING.md). Изменения: [CHANGELOG.md](CHANGELOG.md).
+
+## Участие и поддержка
+
+Принимаем сообщения об ошибках, улучшения документации и небольшие целевые изменения на русском/английском. **Fork → отдельная ветка → pull request в `main`**; точные команды и проверки без аккаунта описаны в [CONTRIBUTING.md](CONTRIBUTING.md#по-русски). Публичный fork не даёт права записи в этот репозиторий. Об уязвимостях сообщайте по [SECURITY.md](SECURITY.md#по-русски), используя вымышленные примеры.
+
+Если проект вам полезен, поставьте [⭐ звезду на GitHub](https://github.com/daniil-novel/telegram-mcp). Это помогает другим людям найти инструмент.
 
 ## Планируемый слой приватности
 

@@ -5,13 +5,17 @@ import stat
 import tempfile
 from pathlib import Path
 
+from .exceptions import PublicError
+
 
 def reject_links(path: Path) -> None:
     for item in (path, *path.parents):
-        if item.exists():
+        try:
             info = item.lstat()
-            if item.is_symlink() or getattr(info, "st_file_attributes", 0) & 0x400:
-                raise ValueError("Secret storage must not use symlinks or Windows junctions.")
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 0x400:
+            raise PublicError("Secret storage must not use symlinks or Windows junctions.")
 
 
 def protect_path(path: Path) -> None:
@@ -55,11 +59,17 @@ class SessionStore:
     """StringSession outside the project: DPAPI on Windows, owner-only file on POSIX."""
 
     def __init__(self, directory: Path):
-        self.directory = directory.absolute()
+        # Check the original path before resolving: resolving first hides symlinks/junctions.
+        reject_links(directory.absolute())
+        self.directory = directory.resolve()
         reject_links(self.directory)
         project = Path(__file__).resolve().parents[2]
         if self.directory.is_relative_to(project):
-            raise ValueError("TELEGRAM_SESSION_DIR must be outside the project.")
+            raise PublicError("TELEGRAM_SESSION_DIR must be outside the project.")
+        # Installed wheels live in site-packages; their package root cannot identify a
+        # user's checkout. Only inspect candidate ancestors for normal/worktree Git markers.
+        if any((parent / ".git").exists() for parent in (self.directory, *self.directory.parents)):
+            raise PublicError("TELEGRAM_SESSION_DIR must be outside Git checkouts.")
         self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         protect_path(self.directory)
         self.path = self.directory / ("session.dpapi" if os.name == "nt" else "session.secret")
@@ -67,7 +77,7 @@ class SessionStore:
     def load(self) -> str:
         reject_links(self.path)
         if not self.path.exists():
-            raise ValueError(
+            raise PublicError(
                 "No local Telegram session. Run the 'auth' command in your own terminal."
             )
         protect_path(self.path)

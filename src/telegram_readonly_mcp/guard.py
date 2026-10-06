@@ -55,10 +55,18 @@ class ReadOnlyViolation(PermissionError):
     pass
 
 
-def require_write_chat(settings: Settings, chat_id: int) -> None:
-    """Shared fail-closed policy, also applied before any backend/network work."""
+def require_read_chat(settings: Settings, chat_id: int) -> None:
     if type(chat_id) is not int or chat_id == 0 or not -(2**63) < chat_id < 2**63:
         raise ReadOnlyViolation("An exact nonzero numeric chat ID is required.")
+    if chat_id in settings.deny_ids or (
+        settings.allow_ids is not None and chat_id not in settings.allow_ids
+    ):
+        raise ReadOnlyViolation("Chat is denied by the local read ACL.")
+
+
+def require_write_chat(settings: Settings, chat_id: int) -> None:
+    """Shared fail-closed policy, also applied before any backend/network work."""
+    require_read_chat(settings, chat_id)
     if not settings.write_enabled:
         raise ReadOnlyViolation("Writes are disabled; set TELEGRAM_WRITE_ENABLED=true locally.")
     if (
