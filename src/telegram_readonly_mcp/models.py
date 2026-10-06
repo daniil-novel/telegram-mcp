@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -108,3 +108,70 @@ class MessageResult(BaseModel):
     message: Message | None
     source: Literal["telegram", "demo"]
     content_is_untrusted: bool = True
+
+
+ChatId = Annotated[int, Field(strict=True, gt=-(2**63), lt=2**63)]
+MessageId = Annotated[int, Field(strict=True, gt=0, le=2**31 - 1)]
+
+
+class WriteInput(BaseModel):
+    # Literal text must retain leading/trailing whitespace. No coercion of IDs or booleans.
+    model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
+    chat_id: ChatId
+
+    @field_validator("chat_id")
+    @classmethod
+    def nonzero_chat_id(cls, value: int) -> int:
+        if value == 0:
+            raise ValueError("Chat ID 0 is invalid.")
+        return value
+
+
+class TextWriteInput(WriteInput):
+    text: str = Field(min_length=1, max_length=4096, description="Literal plain text; no markup.")
+
+    @field_validator("text")
+    @classmethod
+    def telegram_text_limit(cls, value: str) -> str:
+        if not value.strip() or len(value.encode("utf-16-le")) // 2 > 4096:
+            raise ValueError("Text must be nonblank and at most 4096 UTF-16 code units.")
+        return value
+
+
+class SendMessageInput(TextWriteInput):
+    reply_to_message_id: MessageId | None = None
+    silent: bool = Field(default=True, description="Suppress the recipient notification sound.")
+
+
+class EditMessageInput(TextWriteInput):
+    message_id: MessageId
+
+
+class DeleteMessagesInput(WriteInput):
+    message_ids: list[MessageId] = Field(min_length=1, max_length=100)
+    revoke: bool = Field(
+        default=True, description="Delete for everyone; channel deletion always does."
+    )
+
+    @field_validator("message_ids")
+    @classmethod
+    def unique_ids(cls, value: list[int]) -> list[int]:
+        if len(value) != len(set(value)):
+            raise ValueError("Message IDs must be unique.")
+        return value
+
+
+class WriteMessageResult(MessageResult):
+    operation: Literal["send_message", "edit_message"]
+    chat_id: int
+    # An accepted send can have no parsed Message in an unusual Telegram response.
+    accepted: bool = True
+
+
+class DeleteMessagesResult(BaseModel):
+    operation: Literal["delete_messages"] = "delete_messages"
+    chat_id: int
+    requested_message_ids: list[int]
+    revoke: bool
+    accepted: bool = True
+    source: Literal["telegram", "demo"]

@@ -1,0 +1,34 @@
+# Changelog
+
+User-visible changes are recorded here. Entries under Unreleased are prepared changes, not a claim that a version has been published to a package registry.
+
+## [Unreleased]
+
+## [0.2.0] - 2026-10-06
+
+### Added
+
+- Optional `TELEGRAM_WRITE_ENABLED` configuration, with an exact write-destination allowlist. Read-only remains the default.
+- Tools for sending literal text, editing the user's own outgoing messages and deleting the user's own outgoing messages.
+- English and Russian setup guides with language links, Windows/Linux/macOS commands, Telegram API walkthrough illustrations and Codex examples.
+- Contribution and security guidance, MIT license and account-free CI configuration.
+
+### Changed
+
+- Public-facing project name and repository use `telegram-mcp`; the legacy CLI/module and session storage paths remain compatible.
+- Send operations default to silent delivery and disable link previews.
+- Documentation distinguishes this request-driven server from client/browser notifications and background monitors.
+
+### Security
+
+- Write destinations must pass the exact write allowlist and read ACL. Empty write allowlists deny all writes, and wildcards are rejected.
+- Editing/deletion are restricted to the user's outgoing messages. Uncertain write outcomes must not be retried automatically.
+
+## [0.1.0]
+
+### Added
+
+- Initial guarded read-only Telegram MCP with seven read tools, local authorization, protected external session storage, ACLs and pagination.
+- Local stdio, authenticated HTTP, synthetic demo and Docker configuration.
+
+No historical publication date is inferred for this initial version.

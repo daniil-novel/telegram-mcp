@@ -1,1 +1,1 @@
-"""Read-only Telegram MCP. Authorization is available only through the local CLI."""
+"""Unofficial Telegram MCP. Authorization is available only through the local CLI."""

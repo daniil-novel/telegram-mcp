@@ -1,33 +1,62 @@
-# Проверка — 3 октября 2026
+# Validation — 0.2.0
 
-Проект создан и проверен локально на Windows, CPython 3.11.5. Автоматические проверки использовали только синтетические данные. Реальные чаты/сообщения не читались. Отправка, редактирование, удаление сообщений и отметка прочитанного не выполнялись.
+Validation cutoff: 2026-10-06. All Telegram responses used in tests are synthetic.
+No real Telegram message was sent, edited, deleted, marked read or downloaded.
 
-## Выполнено
+## Completed locally
 
-- **41 тест пройдено**: `python -m pytest tests -q`.
-- Ruff check и format --check пройдены; установленный граф зависимостей совместим (`uv pip check`), wheel успешно собран. JSON/TOML конфиги разбираются; Docker Compose прошёл статическую проверку с пустыми синтетическими env-значениями, без Docker Engine.
-- Read-only RPC guard отклоняет отправку/редактирование/удаление, read acknowledgments, join/leave, смену online-статуса, logout, экспорт сессии, получение фоновых updates; проверяются вложенные обёртки и auth-режим.
-- ACL проверен для адресного и глобального чтения; история запрещённых чатов не запрашивается, deny приоритетен. Пустой allowlist запрещает все чаты.
-- Пагинация, архив, поиск по чату и всем чатам, unread с исключением исходящих, latest с лимитом на чат, время с UTC+03:00 и [start,end), защита курсоров, валидация входов, FloodWait и ошибки проверены на синтетических данных.
-- **Реальные итераторы Telethon** получают подставные MTProto-ответы для пользователя, группы и канала. Проверены GetDialogs/GetHistory/Search/GetMessages и guard, включая отдельный channels.GetMessages. Сетевого обращения к Telegram нет.
-- **Windows DPAPI + файловые ACL** проверены сохранением/чтением искусственной строки; файл не содержит её в открытом виде. Файл находится во временной тестовой папке вне проекта.
-- **Настоящий MCP stdio**: отдельный Python-процесс, initialize, tools/list, вызовы всех семи инструментов, отказ неизвестной write-команде и некорректным входам.
-- **Локальный плагин установлен и включён**: `telegram-readonly-mcp@personal`, версия 0.1.0. Установлены отдельный runtime и пакет сервера. Проверены фактические command/args из установленного `.mcp.json`: initialize и список семи read-only tools работают без credentials. Соединение с Telegram открывается только при чтении; отсутствие credentials даёт управляемую ошибку. Навык плагина прошёл quick_validate.
-- Остальные записи персонального каталога, плагины и существующие MCP-настройки сохранены; резервные копии настроек лежат в приватном `%LOCALAPPDATA%\TelegramReadOnlyMCP\install-backups`.
-- `codex mcp list --json` подтверждает загрузку bundled MCP из плагина: `telegram_readonly`, enabled=true. Отдельный дублирующий MCP-конфиг не создавался.
-- Все **10 ответов** из `evaluations/demo.xml` сверены через настоящий MCP stdio, с последовательными вызовами и прохождением страниц. Это проверка ожидаемых ответов и инструментов, не оценка поведения отдельной внешней LLM.
-- **HTTP ASGI**: initialize/tools/list/tools/call, ответ 401 без токена/с неверным токеном, отказы для посторонних Host/Origin, одна Telegram backend lifetime на весь HTTP-процесс.
-- **Настоящий HTTP-процесс**: CLI serve --demo, временный loopback-порт, initialize/tools/list/search через официальный MCP HTTP-клиент; без токена — 401. Процесс после проверки остановлен. Системный прокси отключён только в тестовом HTTP-клиенте.
+- Windows, CPython 3.11.5, pinned Telethon 1.45.0 and MCP SDK 1.30.0.
+- Full suite: **103 passed in 10.83 seconds**. Includes all 41 previous tests and
+  62 new write-mode cases. The final run used a normal Windows process because
+  the restricted execution environment denies named pipes and ACL changes that
+  are required by stdio and private-file tests.
+- Ruff lint and formatting: passed; 22 Python files already formatted.
+- New `telegram-mcp` CLI and legacy `telegram-readonly-mcp` CLI: help works.
+- PowerShell installer and authorization scripts: syntax parsed successfully.
+- Source distribution and wheel built successfully with `uv build --offline`.
+- Release file/config syntax and local Markdown links/fences: validated.
+- Independent write/security review: two found issues were fixed (uncertain
+  server-error write outcomes and service-message read compatibility); no
+  remaining actionable blocker in the reviewed implementation.
 
-## Границы проверки
+## Behavior covered
 
-- **Вход в реальный Telegram, код/2FA, отзыв сессии и реальные Telegram ограничения** остаются непроверенными до самостоятельной авторизации пользователя. Стандартный login hook Telethon заменён, поэтому live login должен подтвердить работоспособность на аккаунте.
-- **Docker-образ не собран и не запущен:** Docker CLI установлен, Linux Docker Engine недоступен (именованный pipe отсутствует). Docker Desktop автоматически не запускался. Dockerfile и compose подготовлены; запуск требует активного Engine и пользовательской авторизации внутри контейнера.
-- **POSIX-права 0600/0700** реализованы, но выполнявшиеся проверки проходили на Windows; Linux/macOS runtime ещё не проверен.
-- **ChatGPT web endpoint/OAuth gateway не создан и не опубликован.** Подготовлены требования и UI-пример. Статический backend bearer не заменяет OAuth для Developer Mode.
-- Плагин Codex **установлен и включён** в пользовательских настройках. Отдельные standalone-конфиги остаются примерами и не добавлялись, чтобы не создавать дубликат сервера. Telegram-сессия пользователя не входит в репозиторий. Для чтения требуется самостоятельная авторизация и обновление плагинов/новый чат после перезапуска клиента.
-- Read-only гарантируется интерфейсом и проверками этого кода; сами MTProto credentials имеют полномочия аккаунта. Ограничения хранения/ACL/пагинации и недоступность secret chats изложены в README.
+- Seven read tools by default; three write tools appear only when enabled.
+- False/default flag, empty write ACL, exact chat IDs, read ACL/deny precedence,
+  auth-mode refusal and ACL denial before opening the backend.
+- Fixed request classes, recursive wrappers, exact request bytes/object identity,
+  caller task and ACL at both Telethon `_call` and `_sender.send` boundaries.
+- Plain text, no markup/link previews, silent sends; Unicode text bounds,
+  strict IDs/booleans, duplicate and oversized deletion lists.
+- Own-message edit/delete, foreign/incoming/service messages refused, all batch
+  IDs validated before deletion, actual peer verification for nonchannel IDs,
+  channel-specific deletion and explicit `revoke=true` requirement.
+- Unknown write outcome after connection loss, timeout, server failure or
+  duplicate-random-ID response. No application-level automatic write retry.
+- Fake-Telethon responses, synthetic demo round trip, real MCP stdio and
+  authenticated HTTP discovery/calls, tool annotations and malformed inputs.
+- Existing read ACL, archive/search/unread/pagination/cursors/timezone intervals,
+  private session storage and local-only interactive authorization behavior.
+- MCP initialization and tool discovery do not open the Telegram connection.
 
-Повторяемые команды, зафиксированные зависимости и шаблоны подключения находятся в README и configs. Runtime и промежуточные материалы проверки не входят в архив проекта.
+## Images and documentation
 
-Дополнительная проверка 3 октября: четыре регрессионных сценария авторизации (пустой ввод, пароль с пробелами, вход без 2FA, повторный ввод 2FA) прошли на настоящих методах Telethon с подставными RPC. Исправление установлено в локальный runtime; запуск установленного и переносимого конфига плагина проверен через MCP initialize/tools/list без чтения Telegram.
+The login image is a real unauthenticated capture; no number/code was entered.
+The post-login images are labeled illustrations with placeholders. All images
+were visually inspected. Actual personal notifications/messages and credentials
+are excluded from the repository. English and Russian READMEs provide reciprocal
+language links and OS-specific setup; image provenance is in docs/images/README.md.
+
+## Limits of the evidence
+
+- Live send/edit/delete was intentionally not performed against the user's
+  account. Telegram's live permissions/edit windows/rate limits still apply.
+- Linux/macOS and Python 3.12/3.13 checks are configured in GitHub Actions; their
+  actual status must be read from the workflow, not inferred from Windows tests.
+- Docker Engine was unavailable locally. Container build/login is not verified
+  here; Windows DPAPI sessions cannot be copied into a Linux container.
+- No public HTTPS/OAuth gateway for ChatGPT web is deployed by this project.
+- The supplied desktop toast's cause was not reproduced. Source and installed
+  runtime contain no toast sender or background Telegram update subscription.
+  Telegram Web/client notifications are a possible separate source; this release
+  does not claim an OS notification permission was changed.

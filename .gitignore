@@ -17,3 +17,5 @@ dist/
 *.tmp
 auth-status.json
 INSTALLATION.json
+.test-tmp*/
+.ci-tmp*/

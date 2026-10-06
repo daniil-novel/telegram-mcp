@@ -52,8 +52,8 @@ async def authorize(settings: Settings) -> None:
         settings.api_id,
         settings.api_hash.get_secret_value(),
         authentication=True,
-        device_model="Telegram Read-only MCP",
-        app_version="0.1.0",
+        device_model="Unofficial Telegram MCP",
+        app_version="0.2.0",
     )
     try:
         await client.connect()
@@ -96,12 +96,12 @@ async def authorize(settings: Settings) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Guarded read-only Telegram MCP")
+    parser = argparse.ArgumentParser(description="Unofficial Telegram MCP; read-only by default")
     parser.add_argument("--env-file", type=Path, help="Explicit local .env path")
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("auth", help="Interactive user-only login; never an MCP tool")
     sub.add_parser("protect-env", help="Restrict .env file permissions to your account")
-    serve = sub.add_parser("serve", help="Start the seven read-only MCP tools")
+    serve = sub.add_parser("serve", help="Start MCP (write tools require explicit configuration)")
     serve.add_argument("--transport", choices=("stdio", "http"), default="stdio")
     serve.add_argument("--host", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8765)

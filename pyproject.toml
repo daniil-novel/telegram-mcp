@@ -3,11 +3,14 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "telegram-readonly-mcp"
-version = "0.1.0"
-description = "Local, guarded read-only Telegram MCP using MTProto"
+name = "telegram-mcp"
+version = "0.2.0"
+description = "Unofficial Telegram MCP for Codex: local MTProto, read-only by default, optional writes"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "daniil-novel"}]
+keywords = ["telegram", "mcp", "codex", "mtproto", "telethon"]
 dependencies = [
   "telethon==1.45.0",
   "mcp==1.30.0",
@@ -20,7 +23,12 @@ dependencies = [
 dev = ["pytest>=9,<10", "pytest-asyncio>=1.4,<2", "ruff>=0.16,<1", "httpx>=0.28,<1"]
 
 [project.scripts]
+telegram-mcp = "telegram_readonly_mcp.cli:main"
 telegram-readonly-mcp = "telegram_readonly_mcp.cli:main"
+
+[project.urls]
+Repository = "https://github.com/daniil-novel/telegram-mcp"
+Issues = "https://github.com/daniil-novel/telegram-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/telegram_readonly_mcp"]

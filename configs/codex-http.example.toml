@@ -1,6 +1,6 @@
 # Start HTTP server yourself. Set this environment variable in the client process.
-[mcp_servers.telegram_readonly_http]
+[mcp_servers.telegram_http]
 url = 'http://127.0.0.1:8765/mcp'
-bearer_token_env_var = 'TELEGRAM_READONLY_MCP_TOKEN'
+bearer_token_env_var = 'TELEGRAM_MCP_HTTP_TOKEN'
 startup_timeout_sec = 60
 tool_timeout_sec = 60

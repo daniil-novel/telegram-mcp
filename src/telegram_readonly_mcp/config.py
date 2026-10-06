@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from dotenv import dotenv_values
-from pydantic import BaseModel, ConfigDict, Field, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, StrictBool, field_validator
 
 
 class Settings(BaseModel):
@@ -14,15 +15,24 @@ class Settings(BaseModel):
     session_dir: Path
     allow_ids: frozenset[int] | None = None
     deny_ids: frozenset[int] = frozenset()
+    write_enabled: StrictBool = False
+    write_allow_ids: frozenset[int] = frozenset()
     http_token: SecretStr = SecretStr("")
     allowed_hosts: tuple[str, ...] = ("127.0.0.1:8765", "localhost:8765")
     allowed_origins: tuple[str, ...] = ("http://127.0.0.1:8765", "http://localhost:8765")
     timeout_seconds: int = 45
     scan_chats: int = 20
 
-    def require_credentials(self) -> None:
-        import re
+    @field_validator("write_allow_ids", mode="before")
+    @classmethod
+    def exact_write_ids(cls, value: object) -> object:
+        if not isinstance(value, (set, frozenset, list, tuple)) or any(
+            type(item) is not int or item == 0 or not -(2**63) < item < 2**63 for item in value
+        ):
+            raise ValueError("Write ACL must contain exact nonzero numeric chat IDs.")
+        return value
 
+    def require_credentials(self) -> None:
         if not self.api_id or not re.fullmatch(
             r"[0-9a-fA-F]{32}", self.api_hash.get_secret_value()
         ):
@@ -41,6 +51,24 @@ def _ids(value: str, *, allow_wildcard: bool = False) -> frozenset[int] | None:
     if 0 in result:
         raise ValueError("Chat ID 0 is invalid.")
     return result
+
+
+def _write_ids(value: str) -> frozenset[int]:
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    if any(not re.fullmatch(r"-?[1-9][0-9]*", item) for item in items):
+        raise ValueError(
+            "TELEGRAM_WRITE_ALLOWED_CHAT_IDS needs exact numeric IDs; '*' is forbidden."
+        )
+    result = frozenset(int(item) for item in items)
+    if any(not -(2**63) < item < 2**63 for item in result):
+        raise ValueError("Write chat IDs must fit in a signed 64-bit integer.")
+    return result
+
+
+def _write_enabled(value: str) -> bool:
+    if value.strip().lower() not in {"true", "false"}:
+        raise ValueError("TELEGRAM_WRITE_ENABLED must be true or false.")
+    return value.strip().lower() == "true"
 
 
 def load_settings(env_file: Path | None = None) -> Settings:
@@ -80,6 +108,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
         session_dir=Path(value("TELEGRAM_SESSION_DIR", str(base))).expanduser().absolute(),
         allow_ids=_ids(str(allowed or ""), allow_wildcard=True),
         deny_ids=_ids(value("TELEGRAM_DENIED_CHAT_IDS")) or frozenset(),
+        write_enabled=_write_enabled(value("TELEGRAM_WRITE_ENABLED", "false")),
+        write_allow_ids=_write_ids(value("TELEGRAM_WRITE_ALLOWED_CHAT_IDS")),
         http_token=SecretStr(value("MCP_HTTP_TOKEN")),
         allowed_hosts=hosts,
         allowed_origins=origins,

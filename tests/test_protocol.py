@@ -105,6 +105,8 @@ async def test_http_auth_host_origin_and_full_protocol(tmp_path):
                 json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
             )
             assert {t["name"] for t in response.json()["result"]["tools"]} == READ_TOOLS
+            # Discovery must stay quiet: it never connects to Telegram or polls messages.
+            assert backend.opens == 0
             response = await client.post(
                 "/mcp",
                 headers=headers,

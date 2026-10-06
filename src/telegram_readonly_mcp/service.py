@@ -13,17 +13,22 @@ from telethon import errors
 
 from .backend import Backend
 from .config import Settings
-from .guard import ReadOnlyViolation
+from .guard import ReadOnlyViolation, require_write_chat
 from .models import (
     AcrossInput,
     BetweenInput,
+    DeleteMessagesInput,
+    DeleteMessagesResult,
     Dialog,
     DialogsInput,
+    EditMessageInput,
     HistoryInput,
     MessageInput,
     MessageResult,
     Page,
     SearchInput,
+    SendMessageInput,
+    WriteMessageResult,
 )
 
 READ_TOOLS = frozenset(
@@ -37,6 +42,12 @@ READ_TOOLS = frozenset(
         "messages_between",
     }
 )
+WRITE_INPUTS = {
+    "send_message": SendMessageInput,
+    "edit_message": EditMessageInput,
+    "delete_messages": DeleteMessagesInput,
+}
+WRITE_TOOLS = frozenset(WRITE_INPUTS)
 
 
 class ReadService:
@@ -113,7 +124,17 @@ class ReadService:
         )
 
     async def execute(self, operation: str, params: Any) -> Any:
-        if operation not in READ_TOOLS:
+        writing = operation in WRITE_TOOLS
+        if writing:
+            if not self.settings.write_enabled:
+                raise ReadOnlyViolation("Write tools are disabled by local configuration.")
+            expected = WRITE_INPUTS[operation]
+            if type(params) is not expected:
+                raise ValueError("Use the exact input model for the requested write tool.")
+            # Revalidate even a constructed/copied Python model before side effects.
+            params = expected.model_validate(params.model_dump(warnings=False))
+            require_write_chat(self.settings, params.chat_id)
+        elif operation not in READ_TOOLS:
             raise ReadOnlyViolation("Only the seven fixed read tools are allowed.")
         try:
             async with asyncio.timeout(self.settings.timeout_seconds), self.lock:
@@ -130,20 +151,70 @@ class ReadService:
             raise ValueError(
                 "Telegram session expired/revoked. Run 'auth' in your terminal."
             ) from None
+        except (errors.ServerError, errors.TimedOutError):
+            raise ValueError(
+                "Write outcome is unknown after a Telegram server error; it may have completed. "
+                "Read the targeted chat before retrying."
+                if writing
+                else "Telegram could not complete the read request. Retry this page later."
+            ) from None
         except errors.RPCError:
             raise ValueError(
-                "Telegram rejected the read request. Check access and retry later."
+                "Telegram rejected the write request. Check message ownership and chat permissions."
+                if writing
+                else "Telegram rejected the read request. Check access and retry later."
             ) from None
         except (ReadOnlyViolation, ValueError):
             raise
         except (OSError, TimeoutError):
             raise ValueError(
-                "Read timed out or connection failed. Retry this page later."
+                "Write outcome is unknown; it may have completed. "
+                "Read the targeted chat before retrying."
+                if writing
+                else "Read timed out or connection failed. Retry this page later."
             ) from None
         except Exception:
             raise ValueError(
-                "Read failed safely; no Telegram write operation was performed."
+                "Write outcome could not be confirmed. Inspect the targeted chat before retrying."
+                if writing
+                else "Read failed safely; no Telegram write operation was performed."
             ) from None
+
+    async def _write_dialog(self, chat_id: int) -> Dialog:
+        require_write_chat(self.settings, chat_id)
+        return await self.require_dialog(chat_id)
+
+    async def _write_message(self, chat_id: int, message_id: int, *, own: bool) -> Any:
+        message = await self.backend.message(chat_id, message_id)
+        if message is None or message.chat_id != chat_id or message.id != message_id:
+            raise ValueError("Message does not exist in the specified chat.")
+        if own and (not message.outgoing or message.service_action):
+            raise ReadOnlyViolation("Only your own outgoing non-service messages can be changed.")
+        return message
+
+    async def send_message(self, params: SendMessageInput) -> WriteMessageResult:
+        params = SendMessageInput.model_validate(params.model_dump(warnings=False))
+        await self._write_dialog(params.chat_id)
+        if params.reply_to_message_id is not None:
+            await self._write_message(params.chat_id, params.reply_to_message_id, own=False)
+        return await self.backend.send_message(params)
+
+    async def edit_message(self, params: EditMessageInput) -> WriteMessageResult:
+        params = EditMessageInput.model_validate(params.model_dump(warnings=False))
+        await self._write_dialog(params.chat_id)
+        previous = await self._write_message(params.chat_id, params.message_id, own=True)
+        if previous.media_type:
+            raise ValueError("Only plain-text messages can be edited through this tool.")
+        return await self.backend.edit_message(params)
+
+    async def delete_messages(self, params: DeleteMessagesInput) -> DeleteMessagesResult:
+        params = DeleteMessagesInput.model_validate(params.model_dump(warnings=False))
+        await self._write_dialog(params.chat_id)
+        if params.chat_id <= -1000000000000 and not params.revoke:
+            raise ValueError("Channels/megagroups always delete for everyone; use revoke=true.")
+        for message_id in params.message_ids:
+            await self._write_message(params.chat_id, message_id, own=True)
+        return await self.backend.delete_messages(params)
 
     async def list_dialogs(self, params: DialogsInput) -> Page:
         binding = self._binding("list_dialogs", params)

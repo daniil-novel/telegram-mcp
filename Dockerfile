@@ -3,7 +3,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 COPY requirements.lock.txt ./
 RUN pip install --no-cache-dir -r requirements.lock.txt
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN pip install --no-cache-dir --no-deps . && \
     useradd --create-home --uid 10001 app && \
@@ -13,5 +13,5 @@ RUN pip install --no-cache-dir --no-deps . && \
 USER app
 ENV TELEGRAM_SESSION_DIR=/home/app/.local/share/telegram-readonly-mcp
 EXPOSE 8765
-ENTRYPOINT ["telegram-readonly-mcp"]
+ENTRYPOINT ["telegram-mcp"]
 CMD ["serve", "--transport", "http", "--host", "0.0.0.0"]

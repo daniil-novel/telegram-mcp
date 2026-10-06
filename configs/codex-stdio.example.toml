@@ -1,7 +1,8 @@
 # Merge only this table into ~/.codex/config.toml; replace both absolute paths.
-[mcp_servers.telegram_readonly]
-command = 'C:\ABSOLUTE\PATH\telegram-readonly-mcp\.venv\Scripts\python.exe'
-args = ['-m', 'telegram_readonly_mcp', '--env-file', 'C:\ABSOLUTE\PATH\telegram-readonly-mcp\.env', 'serve']
+[mcp_servers.telegram]
+command = 'C:\ABSOLUTE\PATH\telegram-mcp\.venv\Scripts\python.exe'
+args = ['-m', 'telegram_readonly_mcp', '--env-file', 'C:\ABSOLUTE\PATH\telegram-mcp\.env', 'serve']
 startup_timeout_sec = 60
 tool_timeout_sec = 60
-enabled_tools = ['list_dialogs', 'get_chat_history', 'get_message', 'search_messages', 'get_unread_messages', 'get_latest_messages', 'messages_between']
+# Optional client restriction. Omit enabled_tools to discover tools selected by .env.
+# enabled_tools = ['list_dialogs', 'get_chat_history', 'get_message', 'search_messages', 'get_unread_messages', 'get_latest_messages', 'messages_between']
