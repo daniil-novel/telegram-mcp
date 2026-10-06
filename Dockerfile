@@ -3,7 +3,7 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 COPY requirements.lock.txt ./
 RUN pip install --require-hashes --no-cache-dir -r requirements.lock.txt
-COPY pyproject.toml README.md LICENSE ./
+COPY pyproject.toml README.md LICENSE NOTICE THIRD_PARTY_NOTICES.md ./
 COPY src ./src
 RUN pip install --no-cache-dir --no-deps . && \
     useradd --create-home --uid 10001 app && \

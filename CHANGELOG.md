@@ -4,6 +4,23 @@ User-visible changes are recorded here. Entries under Unreleased are prepared ch
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-06
+
+### Documentation
+
+- Keep the standard MIT license and explain required copyright/license notices,
+  optional visible attribution and reuse without whole-project copyleft.
+- Add English/Russian licensing guides with Telegram API/content terms,
+  AI-consent boundaries and unresolved client obligations. No platform approval
+  or immunity from third-party claims is promised.
+- Record the licenses of the five inspected direct dependencies, including
+  bundled LGPL components in pywin32, and distinguish Telegram artwork rights.
+
+### Packaging
+
+- Include LICENSE, NOTICE and THIRD_PARTY_NOTICES.md in Python distributions and
+  make the same notice files available to the container build.
+
 ## [0.2.1] - 2026-10-06
 
 ### Security

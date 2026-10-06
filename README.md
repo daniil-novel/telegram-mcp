@@ -9,7 +9,9 @@
 
 **[Setup](#1-install-windows-linux-macos) · [Read tools](#6-read-telegram) · [Optional writes](#7-enable-writes) · [Contribute](CONTRIBUTING.md) · [Security model](docs/security.md)**
 
-A local [Model Context Protocol](https://modelcontextprotocol.io/) server for your Telegram cloud chats, built for **Codex** and other compatible MCP clients. Find dialogs, search messages, read history and unread messages, and summarize a chosen period through Telegram's MTProto API.
+A local [Model Context Protocol](https://modelcontextprotocol.io/) server with support for **Codex** and other compatible MCP clients. Its tools find Telegram dialogs, search messages, read history and unread messages, and summarize a chosen period through MTProto.
+
+**Before using real Telegram data:** read the [platform-use and licensing guide](docs/licensing.md) and [Telegram API Terms](https://core.telegram.org/api/terms). Technical compatibility does not establish permission for AI processing; platform-use questions remain unresolved for this utility. For an account-free trial, use the fictional demo below.
 
 **Read-only by default.** Optionally enable sending text, editing your own messages and deleting your own messages in explicitly allowed chats. No background monitoring or desktop notification sender.
 
@@ -557,4 +559,6 @@ The [live catalog](https://openrouter.ai/api/v1/models) listed [google/gemma-3-4
 
 See [advanced HTTP/Docker/browser guidance](docs/advanced.md). Start with local stdio.
 
-[MIT license](LICENSE). Dependencies keep their own licenses. Telegram names/marks belong to their owners; the official Telegram logo is not this application's logo.
+[MIT license](LICENSE), copyright **2026 daniil-novel**. Retain copyright and permission notices in copies or substantial portions. Visible author credit is welcome as a courtesy; MIT does not require it or make an entire incorporating application MIT-licensed. Practical attribution and platform boundaries: [licensing guide](docs/licensing.md). Dependencies retain their own licenses: [third-party notices](THIRD_PARTY_NOTICES.md).
+
+Telegram names/marks and website artwork retain their owners' rights. The official Telegram logo is not this application's logo.
