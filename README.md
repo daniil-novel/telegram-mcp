@@ -23,6 +23,7 @@ An independent community project, not affiliated with Telegram or OpenAI. Uses y
 - [Notifications](#notifications)
 - [Troubleshooting](#troubleshooting)
 - [Updates and development](#updates-and-development)
+- [Planned privacy layer](#planned-privacy-layer)
 - [Advanced use and license](#advanced-use-and-license)
 
 ## Features
@@ -485,6 +486,58 @@ uv build
 ```
 
 Tests use synthetic/fake responses; passing tests does not establish live testing of every Telegram account/OS/Docker environment. Recorded evidence/limits: [VALIDATION.md](VALIDATION.md). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Changes: [CHANGELOG.md](CHANGELOG.md).
+
+## Planned privacy layer
+
+**Planned, not implemented. Research checked on 2026-10-06.** This release returns permitted Telegram data without automatic anonymization. No privacy flags exist yet. This research used public documentation, with no model downloads, inference or private chats.
+
+Replace identifying information locally **before an MCP response reaches a cloud model**. Pseudonyms retain meaning; encryption protects stored files. Encrypted message text cannot support ordinary semantic analysis. Context can still identify people after pseudonymization; measure disclosure risk using guidance such as [NIST SP 800-188](https://csrc.nist.gov/pubs/sp/800/188/final).
+
+An optional Telegram transport proxy changes network routing; it does not remove personal data from MCP responses.
+
+### Proposed local pipeline
+
+Our recommendation: start with a **read-only pilot**; add write-safe alias resolution only after acceptance tests pass. These are proposed requirements.
+
+| Stage | Proposed behavior |
+| --- | --- |
+| Isolate secrets | Exclude application credentials, sessions, login codes and 2FA from **all** models. Target AEAD-encrypted files with OS-keystore keys across platforms; plaintext remains necessary in process memory. |
+| Scan content | Remove detected/suspected message secrets using deterministic rules before NER/judging. Arbitrary pasted passwords can remain undetected. |
+| Minimize and detect | Cover text, captions, titles, names, usernames, links, IDs and reply/forward metadata. Omit unnecessary fields. Use overlapping bounded chunks and strictly validate spans. |
+| Replace locally | Readable task-scoped labels linked to random, unguessable local handles; encrypted, expiring mapping. Keep original IDs local. Global hashes permit cross-task correlation. |
+| Optional judge | Offline, no tools/network; advisory only, cannot override blocks. Required-stage timeout, OOM, malformed output or unsupported input blocks export. |
+| Gate responses | Cover every read tool, page and error. No raw previews or sensitive content in logs/diagnostics. |
+
+Later, restore aliases **in a local viewer and, after exact approval, immediately before the Telegram operation**: human write approval must bind exact restored text, destination and action while preserving ACLs. Never expose restored plaintext through MCP results, previews, `_meta`, logs or errors.
+
+Coverage ends at this server's new outputs. Previously cloud-sent data, private client prompts/history and other connectors require separate controls.
+
+### Models to evaluate
+
+Recommended **Russian + English pilot**: deterministic rules plus Horizon, optionally a local Qwen judge. Selection is bounded to reviewed candidates.
+
+| Role | Candidate and upstream facts | Why evaluate it |
+| --- | --- | --- |
+| Local detector | [Horizon-Labs/pii-redactor-small](https://huggingface.co/Horizon-Labs/pii-redactor-small): 141M parameters, Apache-2.0, multilingual | Smallest reviewed candidate with published RU/EN evidence; detects spans. |
+| Optional local judge | [Qwen/Qwen3.5-0.8B](https://huggingface.co/Qwen/Qwen3.5-0.8B): 0.8B language-model parameters, Apache-2.0; card claims 201 languages/dialects, documents text-only serving | Intended for prototyping/research; reliable PII judging remains unproven. |
+| Detector comparison | [openai/privacy-filter](https://huggingface.co/openai/privacy-filter): Apache-2.0, 1.5B total / 50M active parameters, multilingual evaluations | Dedicated span detector with much larger resident weights. |
+
+Horizon reports **0.75 character-level redaction recall** on an external Russian dataset: insufficient alone. Published scores use different datasets/definitions and cannot establish a universal ranking. Telegram-specific recall and resource requirements remain unmeasured.
+
+Future dependencies include Transformers/PyTorch or ONNX and a local judge engine. Require reviewed, pinned revisions and SHA-256 weight hashes, offline inference, and **no automatic cloud fallback**, including on model errors.
+
+### OpenRouter: supplementary research only
+
+[Sensitive Info](https://openrouter.ai/docs/guides/features/guardrails/sensitive-info) uses regex/Presidio but proceeds on NLP timeout; OpenRouter already receives the input. [Custom Classifiers](https://openrouter.ai/docs/guides/features/classifiers) run after completion. Neither provides our local pre-egress boundary. [ZDR](https://openrouter.ai/docs/guides/features/zdr) limits retention; providers still process plaintext.
+
+The [live catalog](https://openrouter.ai/api/v1/models) listed [google/gemma-3-4b-it](https://openrouter.ai/google/gemma-3-4b-it) at the cutoff; Qwen3-0.6B/1.7B were absent despite marketing pages. Evaluate Gemma **only on synthetic/already sanitized examples**. A cloud judge must never receive raw chats to decide their export safety.
+
+### Acceptance gates before implementation ships
+
+- Measure RU/EN sensitive-span recall, residual identification risk and summary utility on synthetic Telegram fixtures, including inflection, mixed scripts, secrets and contextual clues.
+- Verify all fields/seven tools, pages, Unicode offsets and expiry. Require zero observed critical leak markers in synthetic egress/log/error tests; structurally isolate application secrets.
+- Test injection, timeout, OOM, malformed outputs and denied networking; preserve ACLs and human authorization, with every processing failure blocking export.
+- Measure CPU/RAM and quantization effects; review dependencies, model hashes and encrypted-map lifecycle. Publish limitations: pseudonymization cannot guarantee anonymity.
 
 ## Advanced use and license
 

@@ -4,6 +4,12 @@ User-visible changes are recorded here. Entries under Unreleased are prepared ch
 
 ## [Unreleased]
 
+### Documentation
+
+- Propose a local privacy filter with encrypted local storage, data minimization,
+  pseudonymization and an optional local LLM judge. Include researched model
+  candidates, limitations and acceptance checks; this is not an implemented feature.
+
 ## [0.2.0] - 2026-10-06
 
 ### Added
