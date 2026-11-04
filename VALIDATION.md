@@ -1,4 +1,19 @@
-# Validation — 0.2.1
+# Validation
+
+## 0.2.3 local login update — 2026-11-04
+
+- Windows CPython 3.11.5: **172 tests passed**; Ruff lint and format checks passed.
+- Fifteen new cases cover phone/password configuration, literal dotenv values
+  and UTF-8 BOM, masked representations, session reuse without a terminal,
+  refusal to request codes from a non-interactive process, bounded password
+  attempts, and an account mismatch without replacing the saved session.
+- Test clients replace Telegram responses. These checks do not demonstrate a
+  live login to a user's account and do not access real credentials or messages.
+- This change adds no dependencies; the existing dependency pins remain intact.
+  Hosted CI results are recorded per commit in
+  [GitHub Actions](https://github.com/daniil-novel/telegram-mcp/actions).
+
+## 0.2.1 historical evidence
 
 Evidence cutoff: 2026-10-06. The 0.2.1 security changes were checked on synthetic
 data only, without accessing a real Telegram account, `.env`, or session.

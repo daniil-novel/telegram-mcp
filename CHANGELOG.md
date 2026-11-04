@@ -4,6 +4,25 @@ User-visible changes are recorded here. Entries under Unreleased are prepared ch
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-04
+
+### Added
+
+- Read the optional `TELEGRAM_PHONE` and `TELEGRAM_2FA_PASSWORD` from the local
+  `.env` file for authorization. A new session still requires the verification
+  code in the user's terminal; the code is never stored in configuration.
+- Reuse an authorized session without prompting, including non-interactive
+  checks. An unauthorized non-interactive process cannot request a login code.
+
+### Changed
+
+- Read dotenv values literally, without expanding `${VARIABLE}` in passwords,
+  and accept UTF-8 files with a Windows editor's byte-order mark.
+- Fail with a redacted, actionable message after an incorrect configured 2FA
+  password rather than retrying the same password. Hidden interactive password
+  entry remains available when the setting is empty.
+- Explain the one-time login and subsequent session reuse in both setup guides.
+
 ## [0.2.2] - 2026-10-06
 
 ### Documentation

@@ -40,7 +40,11 @@ connection fails, the outcome may be unknown; check history before any
 authorized retry to avoid duplicates. Never work around disabled tools or ACLs.
 
 If credentials/session are missing, explain that local authorization is
-incomplete. The user enters api_id/api_hash in their own protected configuration
-and phone/code/2FA in their interactive terminal. Never ask for these secrets in
-chat, read credential/session files, expose them or run login on the user's
-behalf. Use the bilingual README for setup instructions.
+incomplete. The user enters api_id/api_hash in their own protected local
+configuration. They may also set TELEGRAM_PHONE and the optional
+TELEGRAM_2FA_PASSWORD there; the local CLI reads those values. A new or revoked
+session still requires the user to enter the one-time code in their interactive
+terminal. A valid saved session is reused without prompts. Never ask for these
+secrets in chat, read credential/session files, expose them to a model or run
+login on the user's behalf. Do not collect login codes through MCP or another
+account session. Use the bilingual README for setup instructions.

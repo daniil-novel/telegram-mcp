@@ -62,7 +62,9 @@ docker compose run --rm --no-deps telegram auth
 docker compose up telegram
 ```
 
-Enter the phone/code/2FA yourself in the interactive container terminal. The session is stored in the dedicated Compose volume. A Windows DPAPI session cannot be moved into a Linux container: authorize again inside the container.
+Compose passes the local `.env` to the container. Optional `TELEGRAM_PHONE` and `TELEGRAM_2FA_PASSWORD` avoid those prompts when a new login needs them; the one-time code still must be entered by you in the interactive container terminal. With a valid saved session, `auth` asks nothing, and ordinary starts reuse that session. A wrong configured 2FA password stops: correct or clear it before trying again. See [local sign-in](../README.md#4-sign-in-locally).
+
+`build` builds the image. `run --rm --no-deps telegram auth` creates a temporary interactive authorization container, removes it after exit, and does not start other services. `up telegram` starts the configured server. The session survives in the dedicated Compose volume; it is not stored in the temporary container. A Windows DPAPI session cannot be moved into a Linux container: authorize inside the container. Revocation or expiry still requires a new code locally.
 
 The container runs as UID 10001, with a read-only root filesystem, no Linux capabilities and no privilege escalation. Its session volume is writable for authorization/storage protection. Compose publishes the endpoint only on **127.0.0.1:8765**. These are configuration properties; live build/run evidence is listed in [VALIDATION.md](../VALIDATION.md).
 

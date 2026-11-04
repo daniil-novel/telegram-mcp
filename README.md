@@ -43,7 +43,7 @@ An independent community project, not affiliated with Telegram or OpenAI. Uses y
 | Seven read tools | Dialogs, history, one message, search, unread, latest and time ranges |
 | Three optional write tools | Send plain text, edit your own message, delete your own messages |
 | Access control | Separate read/write allowlists; denylist wins |
-| Local authorization | Phone, code and optional 2FA password entered in your terminal |
+| Local authorization | Optional local phone/2FA settings; one-time code in your terminal when a new login is needed |
 | Local session | Windows DPAPI encryption; owner-only files on Linux/macOS |
 | Account-free demo | Three fictional chats and 12 messages; no Telegram connection |
 | Standard MCP | Local stdio and authenticated Streamable HTTP |
@@ -208,12 +208,23 @@ If creation fails, check the current form's requirements and try again later. Th
 Edit **`.env` in the repository root**, beside `pyproject.toml`. Use the Notepad/nano window opened in step 1. Replace both placeholders with your own values, without `<` or `>`:
 
 ```dotenv
+# Your application ID from my.telegram.org; replace this placeholder.
 TELEGRAM_API_ID=<YOUR_NUMERIC_API_ID>
+# Your application secret from the same page; replace this placeholder.
 TELEGRAM_API_HASH=<YOUR_32_CHARACTER_API_HASH>
+# Optional: your international phone number; blank asks during a new login.
+TELEGRAM_PHONE=
+# Optional: your Telegram 2FA password, not the one-time code; blank uses hidden input.
+TELEGRAM_2FA_PASSWORD=
+# Blank uses the protected OS-specific session folder outside this repository.
 TELEGRAM_SESSION_DIR=
+# Read all accessible cloud dialogs; replace * with exact chat IDs to restrict scope.
 TELEGRAM_ALLOWED_CHAT_IDS=*
+# Optional: comma-separated chat IDs to deny, even if otherwise allowed.
 TELEGRAM_DENIED_CHAT_IDS=
+# Keep message-changing tools disabled for the initial setup.
 TELEGRAM_WRITE_ENABLED=false
+# No destinations may receive writes while this list is empty.
 TELEGRAM_WRITE_ALLOWED_CHAT_IDS=
 ```
 
@@ -231,20 +242,25 @@ Never paste API hash, phone, login code, 2FA password, `.env` or session files i
 
 ## 4. Sign in locally
 
-Run this yourself in an **interactive PowerShell/Terminal**, still in the repository:
+You may set `TELEGRAM_PHONE` and, if your account uses two-step verification, `TELEGRAM_2FA_PASSWORD` in your local `.env` before running the command. Both are optional. A configured phone avoids the phone prompt; a configured 2FA password avoids the password prompt when Telegram requests it. Put values containing spaces or `#` in dotenv quotes and preserve the password's exact characters. `.env` is plaintext, even when the Windows session itself is encrypted. Protect it using step 3. You may clear the stored 2FA password after successful authorization: routine starts use the session.
+
+For the first login or a revoked/expired session, run this yourself in an **interactive PowerShell/Terminal**, still in the repository:
 
 ```text
 uv run --frozen telegram-mcp auth
 ```
 
-1. **Telegram phone (+country code, hidden):** enter your number and press Enter.
-2. **Telegram login code (hidden):** enter the new code sent by Telegram and press Enter. This login is separate from `my.telegram.org`.
-3. If requested, **Telegram 2FA password (hidden):** enter your Telegram password and press Enter.
-4. Wait for **Authorized. Session stored locally; no messages were read or changed.**
+`uv run` starts the installed program in the project environment; `--frozen` preserves the dependency lock; `telegram-mcp` names this server; `auth` selects local authorization.
 
-Hidden input shows **no characters or asterisks** while typing. This is expected. The protected session lets later starts work without another code. Codes and 2FA passwords are not saved. Authorization is a separate local command; there is no MCP login tool.
+1. The command first checks the saved session with Telegram. **If it is already valid, it completes without asking for a phone, code or password, including when no interactive terminal is attached.**
+2. For a new login, the configured phone is used. If it is blank, enter your number at **Telegram phone (+country code, hidden)**.
+3. Enter the new **Telegram login code (hidden)** delivered by Telegram. This is a separate login from `my.telegram.org`. The one-time code is always entered locally; there is no setting or MCP tool to fetch it automatically.
+4. If Telegram requests 2FA, the configured password is used once. If it is absent, enter **Telegram 2FA password (hidden)** yourself. An incorrect configured password stops with a request to correct or remove `TELEGRAM_2FA_PASSWORD`; it does not silently retry that value or switch to a prompt.
+5. Wait for successful authorization. The protected session is saved locally; no messages are read or changed by this command.
 
-Inspect/revoke access in **Telegram → Settings → Devices**. The session uses the project device name. Once terminated, the server cannot sign itself in again.
+Hidden input shows **no characters or asterisks** while typing. The one-time code and a password entered at the prompt are not written to `.env`; a password you choose to place in `.env` remains there until you remove it. Authorization is a separate local command, not an MCP login tool.
+
+Later `serve` starts reuse the saved session automatically. You do not need to run `auth` before each request. This lasts while the session remains valid and accessible to the same OS user; it is not permanent authorization. Inspect/revoke access in **Telegram → Settings → Devices**. After revocation or expiry, run `auth` again in your terminal and enter a new code. Saving a phone and password cannot replace that code.
 
 ## 5. Connect to Codex
 
@@ -411,6 +427,8 @@ On Windows use a quoted Windows path.
 | --- | --- | --- |
 | `TELEGRAM_API_ID` | Empty | Your numeric API ID; required for live/auth |
 | `TELEGRAM_API_HASH` | Empty | Your 32-character API hash; required for live/auth |
+| `TELEGRAM_PHONE` | Empty | Optional international phone for a new login; blank prompts locally |
+| `TELEGRAM_2FA_PASSWORD` | Empty | Optional two-step-verification password; blank prompts secretly when required. Not the one-time code |
 | `TELEGRAM_SESSION_DIR` | OS-specific | External session folder; blank uses default |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | `*` | Read all accessible dialogs, exact comma-separated IDs, or empty for none |
 | `TELEGRAM_DENIED_CHAT_IDS` | Empty | Exact IDs denied for both reading and writing; deny wins |
@@ -456,9 +474,11 @@ If you use **Telegram Web**, open the actual Telegram Web site in the **same bro
 | `git`/`uv` not recognized | Reopen the terminal after installation; run version commands. |
 | Missing credentials | Exact `.env` name and location; own values without placeholders; correct absolute `--env-file`. |
 | Auth seems to ignore typing | Hidden input shows nothing. Type and press Enter. |
-| “Use an interactive terminal” | Run `auth` yourself in PowerShell/Terminal, outside an MCP tool. |
+| “Run auth yourself in an interactive terminal” | A new login needs a locally entered code. Run `auth` yourself in PowerShell/Terminal. An already valid saved session needs no terminal. |
+| Incorrect configured 2FA password | Correct or clear `TELEGRAM_2FA_PASSWORD` in the effective local configuration, then run `auth` again. No automatic retry is made. |
 | Telegram rejects auth/form | Check credentials/new code and actual form validation locally; wait if rate-limited. |
 | Missing/expired session | Same OS user/session path; rerun local auth after revocation. |
+| Configured phone differs from the saved account | Correct `TELEGRAM_PHONE` or choose a separate external `TELEGRAM_SESSION_DIR` for another account. Auth does not replace the existing session or switch accounts automatically. |
 | Storage permission error | Normal external local folder, no symlinks/junctions; use `protect-env`, not public permissions. |
 | Duplicate connections | Configure one standalone/plugin entry; stop stale instances. |
 | No write tools | Flag `true`, server restart, client tool-list refresh; check client tool allowlist/old plugin. |

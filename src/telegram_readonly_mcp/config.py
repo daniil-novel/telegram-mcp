@@ -22,6 +22,9 @@ class Settings(BaseModel):
     model_config = ConfigDict(frozen=True, hide_input_in_errors=True)
     api_id: int = Field(default=0, ge=0)
     api_hash: SecretStr = SecretStr("")
+    # Optional login credentials stay masked in model repr and validation messages.
+    phone: SecretStr = SecretStr("")
+    twofa_password: SecretStr = SecretStr("")
     session_dir: Path
     allow_ids: frozenset[int] | None = None
     deny_ids: frozenset[int] = frozenset()
@@ -87,7 +90,11 @@ def _write_enabled(value: str) -> bool:
 
 def load_settings(env_file: Path | None = None) -> Settings:
     # Explicit file, no upward .env discovery. Real environment takes precedence.
-    values = {**dotenv_values(env_file or Path.cwd() / ".env"), **os.environ}
+    # Never expand ${...} inside a password; accept the BOM written by Windows editors.
+    values = {
+        **dotenv_values(env_file or Path.cwd() / ".env", interpolate=False, encoding="utf-8-sig"),
+        **os.environ,
+    }
 
     def value(key: str, default: str = "") -> str:
         return str(values.get(key) or default)
@@ -119,6 +126,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
     return Settings(
         api_id=api_id,
         api_hash=SecretStr(value("TELEGRAM_API_HASH")),
+        phone=SecretStr(value("TELEGRAM_PHONE")),
+        twofa_password=SecretStr(value("TELEGRAM_2FA_PASSWORD")),
         session_dir=Path(value("TELEGRAM_SESSION_DIR", str(base))).expanduser().absolute(),
         allow_ids=_ids(str(allowed or ""), allow_wildcard=True),
         deny_ids=_ids(value("TELEGRAM_DENIED_CHAT_IDS")) or frozenset(),

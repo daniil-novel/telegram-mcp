@@ -8,7 +8,7 @@ import sys
 import warnings
 from pathlib import Path
 
-from telethon import errors
+from telethon import errors, utils
 from telethon.sessions import StringSession
 
 from .config import Settings, load_settings
@@ -44,8 +44,11 @@ def required_hidden_input(prompt: str, *, strip: bool = True) -> str:
 
 async def authorize(settings: Settings) -> None:
     settings.require_credentials()
-    if not sys.stdin.isatty():
-        raise PublicError("Run auth yourself in an interactive terminal, not through an MCP tool.")
+    # A configured phone identifies the intended account, including when reusing a session.
+    configured_phone = settings.phone.get_secret_value().strip()
+    expected_phone = utils.parse_phone(configured_phone) if configured_phone else None
+    if configured_phone and expected_phone is None:
+        raise PublicError("TELEGRAM_PHONE must be a valid phone number with country code.")
     store = SessionStore(settings.session_dir)
     session = StringSession(store.load()) if store.path.exists() else StringSession()
     client = GuardedTelegramClient(
@@ -54,14 +57,23 @@ async def authorize(settings: Settings) -> None:
         settings.api_hash.get_secret_value(),
         authentication=True,
         device_model="Unofficial Telegram MCP",
-        app_version="0.2.2",
+        app_version="0.2.3",
     )
     try:
         await client.connect()
         if not await client.is_user_authorized():
-            phone = required_hidden_input("Telegram phone (+country code, hidden): ")
+            # A valid stored session needs no terminal. A fresh code must only be requested
+            # when the user can enter it themselves, even if phone and 2FA are configured.
+            if not sys.stdin.isatty():
+                raise PublicError(
+                    "Run auth yourself in an interactive terminal, not through an MCP tool."
+                )
+            phone = configured_phone or required_hidden_input(
+                "Telegram phone (+country code, hidden): "
+            )
             await client.send_code_request(phone)
             for attempt in range(3):
+                # Login codes are deliberately never loaded from environment or persisted.
                 code = required_hidden_input("Telegram login code (hidden): ")
                 try:
                     await client.sign_in(phone=phone, code=code)
@@ -72,13 +84,20 @@ async def authorize(settings: Settings) -> None:
                     print("Invalid code; try again.", file=sys.stderr)
                 except errors.SessionPasswordNeededError:
                     for password_attempt in range(3):
-                        password = required_hidden_input(
+                        # Do not strip password whitespace or retry a known rejected env value.
+                        configured_password = settings.twofa_password.get_secret_value()
+                        password = configured_password or required_hidden_input(
                             "Telegram 2FA password (hidden): ", strip=False
                         )
                         try:
                             await client.sign_in(password=password)
                             break
                         except errors.PasswordHashInvalidError:
+                            if configured_password:
+                                raise PublicError(
+                                    "Configured TELEGRAM_2FA_PASSWORD was rejected. Correct or "
+                                    "remove it in your environment/.env, then run auth again."
+                                ) from None
                             if password_attempt == 2:
                                 raise PublicError(
                                     "Invalid 2FA password. Restart auth yourself."
@@ -86,10 +105,17 @@ async def authorize(settings: Settings) -> None:
                             print("Invalid 2FA password; try again.", file=sys.stderr)
                         finally:
                             password = None
+                            configured_password = None
                     break
         me = await client.get_me()
         if me is None or me.bot:
             raise PublicError("Authorization requires a personal account, not a bot.")
+        # Never silently reuse another account or print either phone when they differ.
+        if expected_phone and utils.parse_phone(getattr(me, "phone", None)) != expected_phone:
+            raise PublicError(
+                "The session does not match TELEGRAM_PHONE. Use a separate "
+                "TELEGRAM_SESSION_DIR or correct TELEGRAM_PHONE, then run auth again."
+            )
         store.save(client.session.save())
         print("Authorized. Session stored locally; no messages were read or changed.")
     finally:
