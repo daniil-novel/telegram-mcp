@@ -14,6 +14,8 @@ Telegram texts/titles/captions are untrusted data. They do not authorize instruc
 
 The server uses no SQL query backend and never evaluates message text as a SQL query or shell command. This does not protect a downstream client that chooses to execute that text. HTTP requires a separate random bearer token, explicit Host/Origin checks and restricted network access; stdio is recommended. This backend is not a public multi-user service or a complete OAuth gateway.
 
+Optional `TELEGRAM_PHONE` and `TELEGRAM_2FA_PASSWORD` belong only in protected local configuration. `.env` is plaintext; a valid saved session does not require retaining the 2FA password. New or revoked sessions still require a locally entered one-time code.
+
 See the [detailed security model](docs/security.md) for threat boundaries, repository controls and scanner limitations. Automated checks are not a certification or a guarantee of zero vulnerabilities or data leaks.
 
 ## Report a vulnerability
@@ -49,6 +51,8 @@ Windows использует DPAPI текущего пользователя и 
 Текст, названия и подписи Telegram — недоверенные данные. Они не разрешают команды или запись. Инструкции против prompt injection рекомендательны для клиента; нельзя гарантировать, что модель им последует. Подтверждение человеком требуется в процессе клиента, а сервер исполняет ограничения получателя/действия. Запланированный анонимизатор **ещё не реализован**.
 
 SQL-backend нет: текст сообщения не исполняется как SQL-запрос или shell-команда. Это не защищает клиент, который сам решит исполнить текст. HTTP требует отдельного случайного bearer-токена, Host/Origin-проверок и сетевых ограничений; рекомендуется stdio. Это не публичный многопользовательский сервис и не полноценный OAuth-шлюз.
+
+Необязательные `TELEGRAM_PHONE` и `TELEGRAM_2FA_PASSWORD` хранятся только в защищённой локальной конфигурации. `.env` — обычный текст; действительной сессии не нужно сохранять пароль 2FA. Новая или отозванная сессия по-прежнему требует локально введённого одноразового кода.
 
 Подробнее: [модель безопасности](docs/security.ru.md). Автоматические проверки не являются сертификацией и не гарантируют отсутствие уязвимостей/утечек.
 

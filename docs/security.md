@@ -29,7 +29,7 @@ Telegram's session itself has account powers. The code's read-only mode is not a
 | Editing/deleting others' messages | Backend ownership checks for own outgoing messages; bounded batches and plain-text edits | Deletion may be irreversible; Telegram also applies its own permissions. |
 | Extra write capabilities | Exact bounded request shape: no media, scheduling, impersonation, paid sends or arbitrary RPCs | A future capability needs explicit design and tests; annotations alone are only hints. |
 | Cursor tampering/scope switching | HMAC-authenticated pagination bound to the query/ACL and process | Cursors are not an anonymizer or encrypted storage. Restarting invalidates them. |
-| Session/config exposure | Hidden interactive authorization; external session location; private file ownership/permissions; Windows DPAPI; symlink/junction rejection | Linux/macOS sessions are not encrypted at rest. `.env` values and in-memory session data remain sensitive. |
+| Session/config exposure | Hidden code input; optional locally configured phone/2FA; external session location; private file ownership/permissions; Windows DPAPI; symlink/junction rejection | `.env`, including optional 2FA, is plaintext. Linux/macOS sessions are not encrypted at rest. Process memory remains sensitive. |
 | HTTP access by strangers | Bearer authentication before MCP calls; explicit Host/Origin policy; loopback default; bounded request body | Bearer holders share one account's permissions. This is not per-user authorization, TLS termination or a public OAuth service. |
 | Prompt injection in chat content | Responses label `content_is_untrusted=true`; server/client skill warns about messages/titles/captions; ACL/RPC checks still apply | Labels/instructions are advisory, not a complete detector. A client can misuse allowed content, other tools or enabled writes. |
 | Secrets echoed in error paths | MCP validation/unexpected backend errors use value-free diagnostics; input models hide values in error strings; logging is quiet | Successful permitted reads deliberately return text/metadata. Third-party clients and debug instrumentation have separate leak risks. |
@@ -47,6 +47,14 @@ The relevant implementation is in [guard.py](../src/telegram_readonly_mcp/guard.
 - Enable writes only for explicit destinations; inspect the exact chat, text and action in your client before approval. On unknown outcomes, read the targeted history before considering a retry.
 - Keep HTTP loopback-only where possible. Remote deployments need their own secure transport, firewall and caller controls; a token does not create isolation between users.
 - Do not run an unknown fork/branch on your real account. A virtual environment isolates packages, not access to your files/network. Use a disposable environment without real credentials.
+
+## Local credentials and session reuse
+
+`TELEGRAM_PHONE` and `TELEGRAM_2FA_PASSWORD` are optional local settings. They are consumed by local authorization and must never be placed in model prompts, tool arguments, screenshots or diagnostics. A password saved in `.env` remains plaintext until the owner removes it; `protect-env` restricts filesystem permissions but does not encrypt that file. A password entered at the hidden prompt and the one-time login code are not written into configuration. Dotenv interpolation is disabled, so `${...}` is literal text rather than a secret lookup.
+
+A valid saved session is checked before any interactive input is requested, including when `auth` has no terminal attached. A new or revoked session requires a human-entered code in an interactive terminal. There is no MCP tool to collect that code or complete login on the user's behalf. A configured wrong 2FA password is tried once and fails with value-free guidance; an absent password uses the hidden prompt when needed. A configured phone that belongs to a different saved account causes an error rather than an account switch. Correct the setting or use a separate external session directory.
+
+Routine server starts need the saved session, not a retained 2FA password. Session reuse ends when Telegram invalidates access, the owner revokes it, or the local session becomes unavailable. Removing a password from `.env` does not revoke the session. If the file was exposed, secure the affected credentials and review active devices; file-permission repair alone cannot undo disclosure.
 
 ## Repository review and automation
 
