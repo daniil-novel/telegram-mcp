@@ -23,6 +23,11 @@ User-visible changes are recorded here. Entries under Unreleased are prepared ch
   entry remains available when the setting is empty.
 - Explain the one-time login and subsequent session reuse in both setup guides.
 
+### Security
+
+- Refresh the existing lock and hashed exports to patched `certifi` 2026.10.23,
+  `filelock` 4.2.1 and `pyasn1` 0.6.5; preserve other package versions.
+
 ## [0.2.2] - 2026-10-06
 
 ### Documentation

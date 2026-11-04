@@ -9,8 +9,9 @@
   attempts, and an account mismatch without replacing the saved session.
 - Test clients replace Telegram responses. These checks do not demonstrate a
   live login to a user's account and do not access real credentials or messages.
-- This change adds no dependencies; the existing dependency pins remain intact.
-  Hosted CI results are recorded per commit in
+- This change adds no direct dependencies. Existing lockfile entries for
+  `certifi`, `filelock` and `pyasn1` are updated to patched versions; other
+  package versions are retained. Hosted CI results are recorded per commit in
   [GitHub Actions](https://github.com/daniil-novel/telegram-mcp/actions).
 
 ## 0.2.1 historical evidence
