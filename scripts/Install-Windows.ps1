@@ -53,7 +53,7 @@ try {
         & $pythonExe -m pip uninstall --yes telegram-readonly-mcp
         Assert-LastExit 'Legacy Telegram MCP package removal'
     }
-    & $pythonExe -m pip install --no-deps --no-index $wheelPath
+    & $pythonExe -m pip install --force-reinstall --no-deps --no-index $wheelPath
     Assert-LastExit 'Telegram MCP package installation'
 } catch {
     Write-Warning 'The package upgrade did not finish. Dependencies and local configuration were retained.'
@@ -70,6 +70,9 @@ if (-not (Test-Path -LiteralPath $envFile)) {
     Assert-LastExit 'Private configuration permissions'
 }
 # Existing .env files are never opened, rewritten or re-protected by this installer.
+foreach ($launcher in 'Authorize-Telegram.ps1', 'Authorize-Telegram.cmd') {
+    Copy-Item -LiteralPath (Join-Path $PSScriptRoot $launcher) -Destination $baseDir -Force
+}
 
 # Only file paths are global. Telegram secrets remain in the protected .env.
 [Environment]::SetEnvironmentVariable('TELEGRAM_READONLY_MCP_HOME', $baseDir, 'User')
@@ -82,5 +85,5 @@ if (-not $SkipPlugin) {
     Assert-LastExit 'Plugin installation'
 }
 Write-Host 'Installed. Existing configuration and Telegram session have been preserved.'
-Write-Host 'Fill api_id/api_hash locally if missing, then run scripts/Authorize-Telegram.ps1.'
+Write-Host "Fill api_id/api_hash locally if missing, then open $baseDir\Authorize-Telegram.cmd."
 Write-Host 'Restart Codex and open a new chat after successful authorization.'

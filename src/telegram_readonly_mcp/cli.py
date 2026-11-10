@@ -42,14 +42,15 @@ def required_hidden_input(prompt: str, *, strip: bool = True) -> str:
     raise PublicError("No value entered. Restart auth yourself in your terminal.")
 
 
-async def authorize(settings: Settings) -> None:
+async def authorize(settings: Settings, *, remember_phone: bool = False) -> None:
     settings.require_credentials()
-    # A configured phone identifies the intended account, including when reusing a session.
+    store = SessionStore(settings.session_dir)
     configured_phone = settings.phone.get_secret_value().strip()
+    if remember_phone and not configured_phone:
+        configured_phone = store.load_phone() or ""
     expected_phone = utils.parse_phone(configured_phone) if configured_phone else None
     if configured_phone and expected_phone is None:
         raise PublicError("TELEGRAM_PHONE must be a valid phone number with country code.")
-    store = SessionStore(settings.session_dir)
     session = StringSession(store.load()) if store.path.exists() else StringSession()
     client = GuardedTelegramClient(
         session,
@@ -111,12 +112,15 @@ async def authorize(settings: Settings) -> None:
         if me is None or me.bot:
             raise PublicError("Authorization requires a personal account, not a bot.")
         # Never silently reuse another account or print either phone when they differ.
-        if expected_phone and utils.parse_phone(getattr(me, "phone", None)) != expected_phone:
+        account_phone = utils.parse_phone(getattr(me, "phone", None))
+        if expected_phone and account_phone != expected_phone:
             raise PublicError(
-                "The session does not match TELEGRAM_PHONE. Use a separate "
-                "TELEGRAM_SESSION_DIR or correct TELEGRAM_PHONE, then run auth again."
+                "The session does not match TELEGRAM_PHONE or the remembered number. "
+                "Check TELEGRAM_PHONE or use a separate TELEGRAM_SESSION_DIR, then run auth again."
             )
         store.save(client.session.save())
+        if remember_phone and account_phone:
+            store.save_phone("+" + account_phone)
         print("Authorized. Session stored locally; no messages were read or changed.")
     finally:
         await client.disconnect()
@@ -126,7 +130,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Unofficial Telegram MCP; read-only by default")
     parser.add_argument("--env-file", type=Path, help="Explicit local .env path")
     sub = parser.add_subparsers(dest="action", required=True)
-    sub.add_parser("auth", help="Interactive user-only login; never an MCP tool")
+    auth = sub.add_parser("auth", help="Interactive user-only login; never an MCP tool")
+    auth.add_argument(
+        "--remember-phone",
+        action="store_true",
+        help="Remember the verified account number locally for subsequent logins",
+    )
     sub.add_parser("protect-env", help="Restrict .env file permissions to your account")
     serve = sub.add_parser("serve", help="Start MCP (write tools require explicit configuration)")
     serve.add_argument("--transport", choices=("stdio", "http"), default="stdio")
@@ -148,7 +157,7 @@ def main() -> None:
             return
         settings = load_settings(args.env_file)
         if args.action == "auth":
-            asyncio.run(authorize(settings))
+            asyncio.run(authorize(settings, remember_phone=args.remember_phone))
             return
         mcp, _ = create_server(settings, demo=args.demo)
         if args.transport == "stdio":
