@@ -12,9 +12,9 @@ try {
     }
     @{ status = 'waiting_for_user'; started_at = (Get-Date).ToUniversalTime().ToString('o') } |
         ConvertTo-Json | Set-Content -LiteralPath $statusFile -Encoding UTF8
-    Write-Host 'Enter your phone, Telegram code and 2FA password here. Input is hidden.'
-    Write-Host 'These values are not sent to Codex. No messages will be read during login.'
-    & $pythonExe -m telegram_readonly_mcp --env-file $envFile auth
+    Write-Host 'For a new login, paste the code from Telegram here and press Enter. Input is hidden.'
+    Write-Host 'Your number is remembered locally. Telegram may also require your 2FA password.'
+    & $pythonExe -m telegram_readonly_mcp --env-file $envFile auth --remember-phone
     $exitStatus = $LASTEXITCODE
     $authState = if ($exitStatus -eq 0) { 'authorized' } else { 'authorization_failed' }
     @{ status = $authState; exit_code = $exitStatus; completed_at = (Get-Date).ToUniversalTime().ToString('o') } |

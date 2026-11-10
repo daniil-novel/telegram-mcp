@@ -242,6 +242,15 @@ Never paste API hash, phone, login code, 2FA password, `.env` or session files i
 
 ## 4. Sign in locally
 
+After running `scripts/Install-Windows.ps1`, double-click
+`%LOCALAPPDATA%\TelegramReadOnlyMCP\Authorize-Telegram.cmd`. On successful sign-in
+the launcher remembers the verified phone in the session directory using Windows DPAPI.
+The next time sign-in is needed, it requests a code for that number. Paste the code
+in the window and press Enter. If Telegram requires an unconfigured 2FA password,
+a second hidden prompt appears. Use `auth --remember-phone` for the same behavior
+in a terminal. An explicit `TELEGRAM_PHONE` takes precedence. To forget the number,
+delete `login-phone.dpapi` (on Linux and macOS, `login-phone.secret`) from the session directory.
+
 You may set `TELEGRAM_PHONE` and, if your account uses two-step verification, `TELEGRAM_2FA_PASSWORD` in your local `.env` before running the command. Both are optional. A configured phone avoids the phone prompt; a configured 2FA password avoids the password prompt when Telegram requests it. Put values containing spaces or `#` in dotenv quotes and preserve the password's exact characters. `.env` is plaintext, even when the Windows session itself is encrypted. Protect it using step 3. You may clear the stored 2FA password after successful authorization: routine starts use the session.
 
 For the first login or a revoked/expired session, run this yourself in an **interactive PowerShell/Terminal**, still in the repository:

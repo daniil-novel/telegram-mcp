@@ -73,15 +73,25 @@ class SessionStore:
         self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
         protect_path(self.directory)
         self.path = self.directory / ("session.dpapi" if os.name == "nt" else "session.secret")
+        self.phone_path = self.path.with_stem("login-phone")
 
     def load(self) -> str:
-        reject_links(self.path)
-        if not self.path.exists():
+        session = self._read_private(self.path)
+        if session is None:
             raise PublicError(
                 "No local Telegram session. Run the 'auth' command in your own terminal."
             )
-        protect_path(self.path)
-        blob = self.path.read_bytes()
+        return session
+
+    def load_phone(self) -> str | None:
+        return self._read_private(self.phone_path)
+
+    def _read_private(self, path: Path) -> str | None:
+        reject_links(path)
+        if not path.exists():
+            return None
+        protect_path(path)
+        blob = path.read_bytes()
         if os.name == "nt":
             import win32crypt
 
@@ -89,8 +99,14 @@ class SessionStore:
         return blob.decode("ascii")
 
     def save(self, session: str) -> None:
-        reject_links(self.path)
-        blob = session.encode("ascii")
+        self._write_private(self.path, session)
+
+    def save_phone(self, phone: str) -> None:
+        self._write_private(self.phone_path, phone)
+
+    def _write_private(self, path: Path, value: str) -> None:
+        reject_links(path)
+        blob = value.encode("ascii")
         if os.name == "nt":
             import win32crypt
 
@@ -103,8 +119,8 @@ class SessionStore:
                 stream.flush()
                 os.fsync(stream.fileno())
             protect_path(temporary)
-            os.replace(temporary, self.path)
-            protect_path(self.path)
+            os.replace(temporary, path)
+            protect_path(path)
         finally:
             if temporary.exists():
                 temporary.unlink()
