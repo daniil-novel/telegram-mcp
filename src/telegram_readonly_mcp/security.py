@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import errno
 import os
 import stat
 import tempfile
 from pathlib import Path
+from typing import BinaryIO
 
 from .exceptions import PublicError
+
+
+class SessionBusy(PublicError):
+    """Another local process is connected using this session."""
 
 
 def reject_links(path: Path) -> None:
@@ -74,6 +80,30 @@ class SessionStore:
         protect_path(self.directory)
         self.path = self.directory / ("session.dpapi" if os.name == "nt" else "session.secret")
         self.phone_path = self.path.with_stem("login-phone")
+
+    def lock_connection(self) -> BinaryIO:
+        """Hold the returned file open until MTProto disconnects, across all local clients."""
+        path = self.directory / "connection.lock"
+        reject_links(path)
+        lock = path.open("a+b")
+        try:
+            lock.seek(0)
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            lock.close()
+            if exc.errno not in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                raise
+            raise SessionBusy(
+                "Telegram session is in use by another local request or login. Try again shortly."
+            ) from None
+        return lock
 
     def load(self) -> str:
         session = self._read_private(self.path)

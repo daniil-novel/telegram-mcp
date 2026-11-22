@@ -7,7 +7,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
-from telethon import TelegramClient, functions, types, utils
+from telethon import TelegramClient, errors, functions, types, utils
 
 from .config import Settings
 from .models import DeleteMessagesInput, EditMessageInput, SendMessageInput
@@ -30,6 +30,8 @@ AUTH_REQUESTS = frozenset(
         functions.auth.SendCodeRequest,
         functions.auth.ResendCodeRequest,
         functions.auth.SignInRequest,
+        functions.auth.ExportLoginTokenRequest,
+        functions.auth.ImportLoginTokenRequest,
         functions.auth.CheckPasswordRequest,
         functions.account.GetPasswordRequest,
     }
@@ -49,6 +51,13 @@ WRITE_REQUESTS = frozenset(
         functions.channels.DeleteMessagesRequest,
     }
 )
+WRITE_OPERATIONS = {
+    functions.messages.SendMessageRequest: "send_message",
+    functions.messages.EditMessageRequest: "edit_message",
+    functions.messages.DeleteMessagesRequest: "delete_messages",
+    functions.channels.DeleteMessagesRequest: "delete_messages",
+}
+SESSION_REJECTED = (errors.UnauthorizedError, errors.AuthKeyError, errors.AuthKeyNotFound)
 
 
 class ReadOnlyViolation(PermissionError):
@@ -64,16 +73,14 @@ def require_read_chat(settings: Settings, chat_id: int) -> None:
         raise ReadOnlyViolation("Chat is denied by the local read ACL.")
 
 
-def require_write_chat(settings: Settings, chat_id: int) -> None:
+def require_write_chat(settings: Settings, chat_id: int, *, operation: str | None = None) -> None:
     """Shared fail-closed policy, also applied before any backend/network work."""
     require_read_chat(settings, chat_id)
     if not settings.write_enabled:
         raise ReadOnlyViolation("Writes are disabled; set TELEGRAM_WRITE_ENABLED=true locally.")
-    if (
-        chat_id not in settings.write_allow_ids
-        or chat_id in settings.deny_ids
-        or (settings.allow_ids is not None and chat_id not in settings.allow_ids)
-    ):
+    if operation == "send_message" and settings.send_to_any_chat:
+        return
+    if chat_id not in settings.write_allow_ids:
         raise ReadOnlyViolation("Chat is denied by the local write/read ACL.")
 
 
@@ -187,6 +194,7 @@ class GuardedTelegramClient(TelegramClient):
         )
         super().__init__(*args, **kwargs)
         self._authentication_mode = authentication
+        self._qr_scan: asyncio.Event | None = None
         self._write_settings = write_settings
         self._write_authorization: ContextVar[_WriteAuthorization | None] = ContextVar(
             "telegram_write_authorization", default=None
@@ -208,7 +216,9 @@ class GuardedTelegramClient(TelegramClient):
         """
         if self._authentication_mode or self._write_settings is None:
             raise ReadOnlyViolation("This Telegram client does not permit writes.")
-        require_write_chat(self._write_settings, chat_id)
+        require_write_chat(
+            self._write_settings, chat_id, operation=WRITE_OPERATIONS.get(type(request))
+        )
         if self._write_authorization.get() is not None:
             raise ReadOnlyViolation("Nested write authorization is disabled.")
         _validate_write_shape(request, chat_id)
@@ -242,7 +252,11 @@ class GuardedTelegramClient(TelegramClient):
             or bytes(request) != approval.snapshot
         ):
             raise ReadOnlyViolation("Write RPC requires an exact backend-approved request.")
-        require_write_chat(self._write_settings, approval.chat_id)
+        require_write_chat(
+            self._write_settings,
+            approval.chat_id,
+            operation=WRITE_OPERATIONS.get(type(request)),
+        )
         _validate_write_shape(request, approval.chat_id)
 
     async def _call(
@@ -260,6 +274,30 @@ class GuardedTelegramClient(TelegramClient):
     async def _borrow_exported_sender(self, dc_id: int) -> Any:
         raise ReadOnlyViolation("Session export is disabled.")
 
+    async def is_user_authorized(self) -> bool:
+        # Telethon's default treats every RPC error as a failed login, including outages.
+        if self._authorized is None:
+            try:
+                await self(functions.updates.GetStateRequest())
+            except SESSION_REJECTED:
+                self._authorized = False
+            else:
+                self._authorized = True
+        return self._authorized
+
+    @contextmanager
+    def watch_login_token(self) -> Iterator[asyncio.Event]:
+        if not self._authentication_mode or self._authorized or self._qr_scan is not None:
+            raise ReadOnlyViolation("QR events are allowed only during interactive login.")
+        event = asyncio.Event()
+        self._qr_scan = event
+        self._no_updates = False
+        try:
+            yield event
+        finally:
+            self._no_updates = True
+            self._qr_scan = None
+
     async def _on_login(self, user: Any) -> Any:
         # Telethon's default hook fetches update differences. Polling tools only
         # need self identity; do not start background account-history fetching.
@@ -268,6 +306,20 @@ class GuardedTelegramClient(TelegramClient):
         return user
 
     async def _update_loop(self) -> None:
-        # The sender still handles MTProto acknowledgments and keepalives.
-        # No update-difference requests or event handlers run in this client.
-        await self.disconnected
+        if not self._authentication_mode:
+            await self.disconnected
+            return
+        # During local QR login, only Telegram's login confirmation reaches the CLI.
+        # Never fetch update differences, process dialog updates or dispatch event handlers.
+        while True:
+            update = await self._updates_queue.get()
+            if self._qr_scan is None:
+                continue
+            if isinstance(update, types.UpdateShort):
+                items = (update.update,)
+            elif isinstance(update, (types.Updates, types.UpdatesCombined)):
+                items = update.updates
+            else:
+                items = (update,)
+            if any(isinstance(item, types.UpdateLoginToken) for item in items):
+                self._qr_scan.set()

@@ -4,6 +4,24 @@ User-visible changes are recorded here. Entries under Unreleased are prepared ch
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-23
+
+### Added
+
+- Interactive QR sign-in and a bilingual Windows launcher. Code sign-in identifies
+  the delivery method. A healthy saved session is reused without prompting.
+- A local `session-check` command and an optional daily Windows task to check an
+  existing session. The task does not fetch chats or perform login.
+- An optional send-to-any-readable-dialog policy, disabled by default. Edits and
+  deletes retain an exact chat allowlist and outgoing-message ownership checks.
+- Agent Skills and instructions for clients using local stdio or a private ChatGPT tunnel.
+
+### Fixed
+
+- Coordinate local clients sharing one authorization key. Each live MCP call
+  releases its connection when done. A scheduled check skips a session in use.
+- Distinguish a rejected saved session from a temporary Telegram or network error.
+
 ## [0.2.3] - 2026-11-04
 
 ### Added

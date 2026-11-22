@@ -70,7 +70,7 @@ if (-not (Test-Path -LiteralPath $envFile)) {
     Assert-LastExit 'Private configuration permissions'
 }
 # Existing .env files are never opened, rewritten or re-protected by this installer.
-foreach ($launcher in 'Authorize-Telegram.ps1', 'Authorize-Telegram.cmd') {
+foreach ($launcher in 'Authorize-Telegram.ps1', 'Authorize-Telegram.cmd', 'Keepalive-Telegram.ps1') {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $launcher) -Destination $baseDir -Force
 }
 

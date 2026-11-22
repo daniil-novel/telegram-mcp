@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from pydantic import SecretStr, ValidationError
-from telethon import errors
+from telethon import errors, types
 from telethon.crypto import AuthKey
 from telethon.sessions import StringSession
 
@@ -57,6 +57,7 @@ def login(monkeypatch, tmp_path):
 
         async def send_code_request(self, phone):
             state.codes.append(phone)
+            return types.auth.SentCode(types.auth.SentCodeTypeApp(length=5), "fake-code-hash")
 
         async def sign_in(self, **kwargs):
             state.sign_ins.append(kwargs)
@@ -149,7 +150,7 @@ async def test_first_or_revoked_session_cannot_request_code_without_terminal(
     with pytest.raises(PublicError, match="interactive terminal"):
         await cli.authorize(settings)
     assert state.prompts == state.codes == state.sign_ins == []
-    assert state.disconnected
+    assert state.disconnected == stored
 
 
 async def test_configured_bad_password_fails_once_without_prompt_or_secret_output(login, capsys):
