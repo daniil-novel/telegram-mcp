@@ -1,0 +1,6 @@
+interface:
+  display_name: "Telegram"
+  short_description: "Читать Telegram и отправлять сообщения по запросу"
+  default_prompt: "Используй $telegram, чтобы найти нужный чат и выполнить моё поручение."
+policy:
+  allow_implicit_invocation: true

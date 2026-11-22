@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from pydantic import SecretStr, ValidationError
-from telethon import errors
+from telethon import errors, types
 from telethon.crypto import AuthKey
 from telethon.sessions import StringSession
 
@@ -57,6 +57,7 @@ def login(monkeypatch, tmp_path):
 
         async def send_code_request(self, phone):
             state.codes.append(phone)
+            return types.auth.SentCode(types.auth.SentCodeTypeApp(length=5), "fake-code-hash")
 
         async def sign_in(self, **kwargs):
             state.sign_ins.append(kwargs)
@@ -149,7 +150,7 @@ async def test_first_or_revoked_session_cannot_request_code_without_terminal(
     with pytest.raises(PublicError, match="interactive terminal"):
         await cli.authorize(settings)
     assert state.prompts == state.codes == state.sign_ins == []
-    assert state.disconnected
+    assert state.disconnected == stored
 
 
 async def test_configured_bad_password_fails_once_without_prompt_or_secret_output(login, capsys):
@@ -203,6 +204,43 @@ async def test_mismatched_configured_phone_preserves_existing_session(login, mon
     output = capsys.readouterr()
     for phone in ("10000000000", "19999999999"):
         assert phone not in str(caught.value) + output.out + output.err
+
+
+async def test_remembered_phone_is_reused_after_session_expires(login):
+    state, settings = login
+    state.inputs = ["+10000000000", "12345"]
+    await cli.authorize(settings, remember_phone=True)
+    store = SessionStore(settings.session_dir)
+    assert store.load_phone() == "+10000000000"
+    state.authorized = False
+    state.prompts.clear()
+    state.inputs = ["56789"]
+    await cli.authorize(settings, remember_phone=True)
+    assert state.codes == ["+10000000000", "+10000000000"]
+    assert len(state.prompts) == 1 and "login code" in state.prompts[0]
+
+
+async def test_existing_session_seeds_phone_without_prompt(login):
+    state, settings = login
+    store = SessionStore(settings.session_dir)
+    store.save(synthetic_session().save())
+    state.authorized = True
+    await cli.authorize(settings, remember_phone=True)
+    assert store.load_phone() == "+10000000000"
+    assert state.prompts == state.codes == []
+
+
+async def test_explicit_phone_overrides_remembered_number_only_after_success(login):
+    state, settings = login
+    store = SessionStore(settings.session_dir)
+    store.save_phone("+19999999999")
+    settings = settings.model_copy(update={"phone": SecretStr("+12222222222")})
+    state.inputs = ["12345"]
+    with pytest.raises(PublicError, match="does not match TELEGRAM_PHONE"):
+        await cli.authorize(settings, remember_phone=True)
+    assert state.codes == ["+12222222222"]
+    assert store.load_phone() == "+19999999999"
+    assert not store.path.exists()
 
 
 async def test_one_time_code_environment_is_ignored(login, monkeypatch):

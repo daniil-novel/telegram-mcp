@@ -326,6 +326,108 @@ async def test_real_rpc_send_plain_text_silent_and_edit_owned_message(rpc_backen
     assert backend.client._request_retries == 0 and backend.client._no_updates is True
 
 
+def test_send_any_chat_is_explicit_and_strict(tmp_path, monkeypatch):
+    for key in (
+        "TELEGRAM_WRITE_ENABLED",
+        "TELEGRAM_WRITE_ALLOWED_CHAT_IDS",
+        "TELEGRAM_SEND_TO_ANY_CHAT",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    env = tmp_path / "synthetic.env"
+    env.write_text("", encoding="utf-8")
+    assert load_settings(env).send_to_any_chat is False
+    env.write_text("TELEGRAM_SEND_TO_ANY_CHAT=true\n", encoding="utf-8")
+    config = load_settings(env)
+    assert config.send_to_any_chat is True and config.write_enabled is False
+    monkeypatch.setenv("TELEGRAM_SEND_TO_ANY_CHAT", "false")
+    assert load_settings(env).send_to_any_chat is False
+    for value in ("yes", "*", "1"):
+        monkeypatch.setenv("TELEGRAM_SEND_TO_ANY_CHAT", value)
+        with pytest.raises(ValueError, match="TELEGRAM_SEND_TO_ANY_CHAT"):
+            load_settings(env)
+    with pytest.raises(ValidationError):
+        settings(tmp_path, send_to_any_chat="true")
+
+
+@pytest.mark.parametrize("chat_id", [101, -202, -1000000000303])
+async def test_send_any_chat_without_destination_list(tmp_path, chat_id):
+    backend = DemoBackend()
+    config = settings(tmp_path, send_to_any_chat=True, write_allow_ids=frozenset())
+    service = ReadService(backend, config)
+    sent = await service.execute("send_message", SendMessageInput(chat_id=chat_id, text="demo"))
+    assert sent.accepted and sent.message.chat_id == chat_id and sent.source == "demo"
+    reply = await service.execute(
+        "send_message",
+        SendMessageInput(chat_id=chat_id, text="reply", reply_to_message_id=sent.message.id),
+    )
+    assert reply.message.reply_to_id == sent.message.id
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"write_enabled": False},
+        {"deny_ids": frozenset({101})},
+        {"allow_ids": frozenset({-202})},
+    ],
+)
+async def test_send_any_chat_respects_disable_and_read_acl(tmp_path, overrides):
+    class Untouched(DemoBackend):
+        async def open(self):
+            raise AssertionError("A denied send must not open a backend")
+
+    config = settings(tmp_path, send_to_any_chat=True, write_allow_ids=frozenset(), **overrides)
+    service = ReadService(Untouched(), config)
+    with pytest.raises(ReadOnlyViolation):
+        await service.execute("send_message", SendMessageInput(chat_id=101, text="never sent"))
+    assert service.opened is False
+
+
+async def test_any_chat_sends_do_not_grant_edits_or_deletions(tmp_path):
+    config = settings(tmp_path, send_to_any_chat=True, write_allow_ids=frozenset())
+    service = ReadService(DemoBackend(), config)
+    sent = await service.execute("send_message", SendMessageInput(chat_id=101, text="keep"))
+    with pytest.raises(ReadOnlyViolation):
+        await service.execute(
+            "edit_message", EditMessageInput(chat_id=101, message_id=sent.message.id, text="bad")
+        )
+    with pytest.raises(ReadOnlyViolation):
+        await service.execute(
+            "delete_messages", DeleteMessagesInput(chat_id=101, message_ids=[sent.message.id])
+        )
+    assert (await service.backend.message(101, sent.message.id)).text == "keep"
+
+
+async def test_send_any_chat_through_backend_and_both_rpc_guards(rpc_backend):
+    backend, requests = rpc_backend
+    config = backend.settings.model_copy(
+        update={"send_to_any_chat": True, "write_allow_ids": frozenset()}
+    )
+    backend.settings = config
+    backend.client._write_settings = config
+    sent = await backend.send_message(
+        SendMessageInput(chat_id=101, text="synthetic", reply_to_message_id=2)
+    )
+    assert sent.message.id == 100 and requests[-1].reply_to.reply_to_msg_id == 2
+    before = len(requests)
+    edit = functions.messages.EditMessageRequest(
+        backend.peers[101], 1, message="bad", no_webpage=True, entities=[]
+    )
+    with pytest.raises(ReadOnlyViolation):
+        with backend.client.authorize_write(edit, 101):
+            await backend.client(edit)
+    with pytest.raises(ReadOnlyViolation):
+        await backend.delete_messages(DeleteMessagesInput(chat_id=101, message_ids=[1]))
+    unapproved = functions.messages.SendMessageRequest(
+        backend.peers[101], "not authorized", no_webpage=True, silent=True, entities=[]
+    )
+    with pytest.raises(ReadOnlyViolation):
+        await backend.client(unapproved)
+    with pytest.raises(ReadOnlyViolation):
+        backend.client._sender.send(unapproved)
+    assert len(requests) == before
+
+
 async def test_nonchannel_ids_cannot_address_other_chats_and_no_partial_delete(rpc_backend):
     backend, requests = rpc_backend
     assert await backend.message(101, 3) is None
@@ -355,11 +457,20 @@ async def test_service_messages_remain_readable_but_not_mutable(rpc_backend, mon
 
     monkeypatch.setattr(backend, "dialogs", dialogs)
     service = ReadService(backend, backend.settings)
-    service.opened = True  # Synthetic RPC backend is ready; never load a session/connect.
+    client = backend.client
+
+    async def open_synthetic_connection():
+        backend.client = client
+        backend.peers[101] = types.InputPeerUser(101, 11)
+
+    monkeypatch.setattr(backend, "open", open_synthetic_connection)
     result = await service.execute("get_message", MessageInput(chat_id=101, message_id=6))
     assert result.message.service_action == "MessageActionPinMessage"
+    assert not service.opened and backend.client is None
     with pytest.raises(ReadOnlyViolation, match="non-service"):
-        await backend.edit_message(EditMessageInput(chat_id=101, message_id=6, text="bad"))
+        await service.execute(
+            "edit_message", EditMessageInput(chat_id=101, message_id=6, text="bad")
+        )
     assert not any(type(r) is functions.messages.EditMessageRequest for r in requests)
 
 
@@ -624,7 +735,8 @@ async def test_authenticated_http_write_and_denied_chat(tmp_path):
         assert response.json()["result"]["isError"] is True
 
 
-async def test_enabled_stdio_protocol_with_synthetic_writes_only(tmp_path, monkeypatch):
+@pytest.mark.parametrize("send_any", [False, True])
+async def test_enabled_stdio_protocol_with_synthetic_writes_only(tmp_path, monkeypatch, send_any):
     monkeypatch.setenv("TELEGRAM_WRITE_ENABLED", "true")
     monkeypatch.setenv("TELEGRAM_WRITE_ALLOWED_CHAT_IDS", "101")
     monkeypatch.setenv("TELEGRAM_ALLOWED_CHAT_IDS", "*")
@@ -643,7 +755,8 @@ async def test_enabled_stdio_protocol_with_synthetic_writes_only(tmp_path, monke
         ],
         env={
             "TELEGRAM_WRITE_ENABLED": "true",
-            "TELEGRAM_WRITE_ALLOWED_CHAT_IDS": "101",
+            "TELEGRAM_WRITE_ALLOWED_CHAT_IDS": "" if send_any else "101",
+            "TELEGRAM_SEND_TO_ANY_CHAT": str(send_any).lower(),
             "TELEGRAM_ALLOWED_CHAT_IDS": "*",
             "TELEGRAM_DENIED_CHAT_IDS": "",
             "TELEGRAM_API_ID": "0",
@@ -669,10 +782,16 @@ async def test_enabled_stdio_protocol_with_synthetic_writes_only(tmp_path, monke
             "edit_message",
             {"params": {"chat_id": 101, "message_id": message_id, "text": "changed"}},
         )
-        assert not edited.isError and edited.structuredContent["message"]["text"] == "changed"
+        if send_any:
+            assert edited.isError
+        else:
+            assert not edited.isError and edited.structuredContent["message"]["text"] == "changed"
         deleted = await session.call_tool(
             "delete_messages",
             {"params": {"chat_id": 101, "message_ids": [message_id]}},
         )
-        assert not deleted.isError and deleted.structuredContent["accepted"] is True
+        if send_any:
+            assert deleted.isError
+        else:
+            assert not deleted.isError and deleted.structuredContent["accepted"] is True
     assert not (tmp_path / "never-created").exists()

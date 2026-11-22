@@ -25,7 +25,7 @@ Telegram's session itself has account powers. The code's read-only mode is not a
 | Threat or concern | Existing control | Remaining boundary |
 | --- | --- | --- |
 | Unexpected Telegram mutation | Fixed read tools; exact MTProto request-class allowlist, nested-wrapper checks and guards at both call/send boundaries | Modified code, compromised runtime or a stolen session is outside this boundary. |
-| Writes to unwanted destinations | Disabled by default; separate exact write-ID allowlist; denylist wins and read ACL still applies | Once enabled, a permitted client can request configured writes. The server cannot independently prove a human approved each call. |
+| Writes to unwanted destinations | Disabled by default. Exact write IDs by default. Opt-in broader sending still requires an existing readable dialog; edits/deletes retain exact IDs. | The client enforces the human's authorization for each permitted write. The server alone cannot verify human intent. |
 | Editing/deleting others' messages | Backend ownership checks for own outgoing messages; bounded batches and plain-text edits | Deletion may be irreversible; Telegram also applies its own permissions. |
 | Extra write capabilities | Exact bounded request shape: no media, scheduling, impersonation, paid sends or arbitrary RPCs | A future capability needs explicit design and tests; annotations alone are only hints. |
 | Cursor tampering/scope switching | HMAC-authenticated pagination bound to the query/ACL and process | Cursors are not an anonymizer or encrypted storage. Restarting invalidates them. |

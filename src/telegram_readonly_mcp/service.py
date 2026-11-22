@@ -11,10 +11,10 @@ from typing import Any
 
 from telethon import errors
 
-from .backend import Backend
+from .backend import Backend, TelegramBackend
 from .config import Settings
 from .exceptions import PublicError
-from .guard import ReadOnlyViolation, require_read_chat, require_write_chat
+from .guard import SESSION_REJECTED, ReadOnlyViolation, require_read_chat, require_write_chat
 from .models import (
     AcrossInput,
     BetweenInput,
@@ -146,7 +146,7 @@ class ReadService:
                 raise PublicError("Use the exact input model for the requested write tool.")
             # Revalidate even a constructed/copied Python model before side effects.
             params = expected.model_validate(params.model_dump(warnings=False))
-            require_write_chat(self.settings, params.chat_id)
+            require_write_chat(self.settings, params.chat_id, operation=operation)
         elif operation not in READ_TOOLS:
             raise ReadOnlyViolation("Only the seven fixed read tools are allowed.")
         else:
@@ -162,10 +162,17 @@ class ReadService:
                 if not self.opened:
                     await self.backend.open()
                     self.opened = True
-                return await getattr(self, operation)(params)
+                try:
+                    return await getattr(self, operation)(params)
+                finally:
+                    # The local stdio client, HTTP client, and background check may use the
+                    # same saved key. Release the connection as soon as this call finishes.
+                    if isinstance(self.backend, TelegramBackend):
+                        self.opened = False
+                        await self.backend.close()
         except errors.FloodWaitError as exc:
             raise PublicError(f"Telegram rate limit. Retry after {exc.seconds} seconds.") from None
-        except (errors.UnauthorizedError, errors.AuthKeyError):
+        except SESSION_REJECTED:
             raise PublicError(
                 "Telegram session expired/revoked. Run 'auth' in your terminal."
             ) from None
@@ -198,8 +205,8 @@ class ReadService:
                 else "Read failed safely; no Telegram write operation was performed."
             ) from None
 
-    async def _write_dialog(self, chat_id: int) -> Dialog:
-        require_write_chat(self.settings, chat_id)
+    async def _write_dialog(self, chat_id: int, *, operation: str) -> Dialog:
+        require_write_chat(self.settings, chat_id, operation=operation)
         return await self.require_dialog(chat_id)
 
     async def _write_message(self, chat_id: int, message_id: int, *, own: bool) -> Any:
@@ -212,14 +219,14 @@ class ReadService:
 
     async def send_message(self, params: SendMessageInput) -> WriteMessageResult:
         params = SendMessageInput.model_validate(params.model_dump(warnings=False))
-        await self._write_dialog(params.chat_id)
+        await self._write_dialog(params.chat_id, operation="send_message")
         if params.reply_to_message_id is not None:
             await self._write_message(params.chat_id, params.reply_to_message_id, own=False)
         return await self.backend.send_message(params)
 
     async def edit_message(self, params: EditMessageInput) -> WriteMessageResult:
         params = EditMessageInput.model_validate(params.model_dump(warnings=False))
-        await self._write_dialog(params.chat_id)
+        await self._write_dialog(params.chat_id, operation="edit_message")
         previous = await self._write_message(params.chat_id, params.message_id, own=True)
         if previous.media_type:
             raise PublicError("Only plain-text messages can be edited through this tool.")
@@ -227,7 +234,7 @@ class ReadService:
 
     async def delete_messages(self, params: DeleteMessagesInput) -> DeleteMessagesResult:
         params = DeleteMessagesInput.model_validate(params.model_dump(warnings=False))
-        await self._write_dialog(params.chat_id)
+        await self._write_dialog(params.chat_id, operation="delete_messages")
         if params.chat_id <= -1000000000000 and not params.revoke:
             raise PublicError("Channels/megagroups always delete for everyone; use revoke=true.")
         for message_id in params.message_ids:

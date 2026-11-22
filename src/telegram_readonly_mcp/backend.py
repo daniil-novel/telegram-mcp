@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 from telethon import functions, types, utils
 from telethon.sessions import StringSession
 
+from . import __version__
 from .config import Settings
 from .exceptions import PublicError
 from .guard import GuardedTelegramClient, ReadOnlyViolation, require_read_chat, require_write_chat
@@ -77,24 +78,26 @@ class TelegramBackend:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.client: GuardedTelegramClient | None = None
+        self._connection_lock: BinaryIO | None = None
         self.peers: dict[int, object] = {}
         self.self_peer: types.InputPeerUser | None = None
 
     async def open(self) -> None:
         self.settings.require_credentials()
-        session = StringSession(SessionStore(self.settings.session_dir).load())
-        self.client = GuardedTelegramClient(
-            session,
-            self.settings.api_id,
-            self.settings.api_hash.get_secret_value(),
-            write_settings=self.settings,
-            device_model="Unofficial Telegram MCP",
-            app_version="0.2.3",
-        )
+        store = SessionStore(self.settings.session_dir)
+        self._connection_lock = store.lock_connection()
         try:
+            self.client = GuardedTelegramClient(
+                StringSession(store.load()),
+                self.settings.api_id,
+                self.settings.api_hash.get_secret_value(),
+                write_settings=self.settings,
+                device_model="Unofficial Telegram MCP",
+                app_version=__version__,
+            )
             await self.client.connect()
             if not await self.client.is_user_authorized():
-                raise PublicError("Telegram session expired. Run 'auth' locally again.")
+                raise PublicError("Telegram did not authorize the saved session. Run local 'auth'.")
             me = await self.client.get_me()
             if me is None or me.bot:
                 raise PublicError("A personal Telegram account session is required, not a bot.")
@@ -104,11 +107,16 @@ class TelegramBackend:
             raise
 
     async def close(self) -> None:
-        if self.client is not None:
-            await self.client.disconnect()
+        try:
+            if self.client is not None:
+                await self.client.disconnect()
+        finally:
             self.client = None
             self.self_peer = None
             self.peers = {}
+            if self._connection_lock is not None:
+                self._connection_lock.close()
+                self._connection_lock = None
 
     def _client(self) -> GuardedTelegramClient:
         if self.client is None:
@@ -256,7 +264,7 @@ class TelegramBackend:
 
     async def send_message(self, params: SendMessageInput) -> WriteMessageResult:
         params = SendMessageInput.model_validate(params.model_dump(warnings=False))
-        require_write_chat(self.settings, params.chat_id)
+        require_write_chat(self.settings, params.chat_id, operation="send_message")
         client = self._client()
         peer = self._peer(params.chat_id)
         if params.reply_to_message_id is not None:

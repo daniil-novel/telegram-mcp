@@ -11,7 +11,7 @@ licenses. The project's MIT license does not relicense them.
 ### Direct runtime dependencies
 
 This inventory was checked against the actual license files and metadata of
-these installed versions on 2026-10-06. It covers the five direct runtime
+these installed versions on 2026-10-06 and qrcode on 2026-11-22. It covers the direct runtime
 requirements, not every transitive dependency or native binary. Uvicorn is a
 version range in the project; the inspected lock/runtime version is shown here.
 
@@ -20,6 +20,7 @@ version range in the project; the inspected lock/runtime version is shown here.
 | Telethon | 1.45.0 | MIT; copyright 2016–Present LonamiWebs | [PyPI](https://pypi.org/project/Telethon/1.45.0/) |
 | MCP Python SDK (`mcp`) | 1.30.0 | MIT; copyright 2024 Anthropic, PBC | [PyPI](https://pypi.org/project/mcp/1.30.0/) |
 | python-dotenv | 1.2.4 | BSD-3-Clause; notices for Saurabh Kumar, Ted Tieken and Jacob Kaplan-Moss | [PyPI](https://pypi.org/project/python-dotenv/1.2.4/) |
+| qrcode | 8.2 | BSD-3-Clause; copyright 2011 Lincoln Loop | [PyPI](https://pypi.org/project/qrcode/8.2/) |
 | Uvicorn | 0.54.0 | BSD-3-Clause; copyright 2017–present Encode OSS Ltd. | [PyPI](https://pypi.org/project/uvicorn/0.54.0/) |
 | pywin32 (Windows only) | 312 | Metadata says PSF; the wheel contains several component licenses, described below | [PyPI](https://pypi.org/project/pywin32/312/) |
 
@@ -84,7 +85,7 @@ Telegram names and brands identify the service; this is an unofficial project.
 ### Прямые зависимости времени выполнения
 
 Перечень проверен по реальным файлам лицензий и метаданным установленных версий
-2026-10-06. Он охватывает пять прямых зависимостей, а не все транзитивные
+2026-10-06 и дополнен qrcode 2026-11-22. Он охватывает прямые зависимости, а не все транзитивные
 зависимости или нативные библиотеки. В проекте Uvicorn задан диапазоном версий;
 в таблице указана проверенная версия из зафиксированной среды.
 
@@ -93,6 +94,7 @@ Telegram names and brands identify the service; this is an unofficial project.
 | Telethon | 1.45.0 | MIT; copyright 2016–Present LonamiWebs | [PyPI](https://pypi.org/project/Telethon/1.45.0/) |
 | MCP Python SDK (`mcp`) | 1.30.0 | MIT; copyright 2024 Anthropic, PBC | [PyPI](https://pypi.org/project/mcp/1.30.0/) |
 | python-dotenv | 1.2.4 | BSD-3-Clause; уведомления Saurabh Kumar, Ted Tieken и Jacob Kaplan-Moss | [PyPI](https://pypi.org/project/python-dotenv/1.2.4/) |
+| qrcode | 8.2 | BSD-3-Clause; copyright 2011 Lincoln Loop | [PyPI](https://pypi.org/project/qrcode/8.2/) |
 | Uvicorn | 0.54.0 | BSD-3-Clause; copyright 2017–present Encode OSS Ltd. | [PyPI](https://pypi.org/project/uvicorn/0.54.0/) |
 | pywin32 (только Windows) | 312 | В метаданных указана PSF; wheel содержит несколько лицензий компонентов, см. ниже | [PyPI](https://pypi.org/project/pywin32/312/) |
 

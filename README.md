@@ -50,6 +50,8 @@ An independent community project, not affiliated with Telegram or OpenAI. Uses y
 
 Returns message text/captions and attachment metadata; does not download media, join channels, access secret chats or provide arbitrary Telegram API calls. Reading does not mark messages as read. Write mode adds only the three documented operations.
 
+For ChatGPT web, use the [private tunnel guide](docs/chatgpt-tunnel.md). For other LLMs, use the [assistant setup and tool guide](docs/llm-setup.md).
+
 ## 1. Install: Windows, Linux, macOS
 
 You need an existing Telegram account, Internet access, Git, uv and Python 3.11 or newer. The commands install Python 3.11 through uv and create an isolated `.venv`; activation is unnecessary.
@@ -242,25 +244,28 @@ Never paste API hash, phone, login code, 2FA password, `.env` or session files i
 
 ## 4. Sign in locally
 
-You may set `TELEGRAM_PHONE` and, if your account uses two-step verification, `TELEGRAM_2FA_PASSWORD` in your local `.env` before running the command. Both are optional. A configured phone avoids the phone prompt; a configured 2FA password avoids the password prompt when Telegram requests it. Put values containing spaces or `#` in dotenv quotes and preserve the password's exact characters. `.env` is plaintext, even when the Windows session itself is encrypted. Protect it using step 3. You may clear the stored 2FA password after successful authorization: routine starts use the session.
-
-For the first login or a revoked/expired session, run this yourself in an **interactive PowerShell/Terminal**, still in the repository:
+After installing on Windows, open `Authorize-Telegram.cmd` in `%LOCALAPPDATA%\TelegramReadOnlyMCP`. It checks the saved session first. When sign-in is needed, choose **1** for QR or **2** for a login code. To open the same menu from the repository, run:
 
 ```text
-uv run --frozen telegram-mcp auth
+uv run --frozen telegram-mcp auth --method menu --remember-phone --lang en
 ```
 
-`uv run` starts the installed program in the project environment; `--frozen` preserves the dependency lock; `telegram-mcp` names this server; `auth` selects local authorization.
+The optional `TELEGRAM_PHONE` and `TELEGRAM_2FA_PASSWORD` still work. An explicit phone overrides the remembered value. The CLI does not save a password you type at the prompt. A password you place in .env remains there until you remove it.
 
-1. The command first checks the saved session with Telegram. **If it is already valid, it completes without asking for a phone, code or password, including when no interactive terminal is attached.**
-2. For a new login, the configured phone is used. If it is blank, enter your number at **Telegram phone (+country code, hidden)**.
-3. Enter the new **Telegram login code (hidden)** delivered by Telegram. This is a separate login from `my.telegram.org`. The one-time code is always entered locally; there is no setting or MCP tool to fetch it automatically.
-4. If Telegram requests 2FA, the configured password is used once. If it is absent, enter **Telegram 2FA password (hidden)** yourself. An incorrect configured password stops with a request to correct or remove `TELEGRAM_2FA_PASSWORD`; it does not silently retry that value or switch to a prompt.
-5. Wait for successful authorization. The protected session is saved locally; no messages are read or changed by this command.
+For [QR login](https://core.telegram.org/api/qr-login), open **Settings → Devices → Link Desktop Device** in Telegram on your phone, scan the QR code and confirm. The QR window requires Tkinter. For code login, the terminal tells you where Telegram sent the code. If it specifies the Telegram service chat, check a device already signed in. Either method can require your Telegram two-step verification password.
 
-Hidden input shows **no characters or asterisks** while typing. The one-time code and a password entered at the prompt are not written to `.env`; a password you choose to place in `.env` remains there until you remove it. Authorization is a separate local command, not an MCP login tool.
+Type the requested value and press Enter. Input is hidden. If the code does not arrive, cancel with Ctrl+C and choose QR. The launcher stores the verified phone number in protected storage for future sign-ins. It does not save the code or the password you type.
 
-Later `serve` starts reuse the saved session automatically. You do not need to run `auth` before each request. This lasts while the session remains valid and accessible to the same OS user; it is not permanent authorization. Inspect/revoke access in **Telegram → Settings → Devices**. After revocation or expiry, run `auth` again in your terminal and enter a new code. Saving a phone and password cannot replace that code.
+Inspect/revoke access in **Telegram → Settings → Devices**. The session uses the project device name. Once terminated, the server cannot sign itself in again.
+
+Windows can run a daily session check at 13:00 local time under your signed-in Windows account, even with Codex closed. The check contacts Telegram to verify the session without fetching chats. It skips a busy session. Stale clients must restart after the upgrade so they use the same connection lock. Telegram can still revoke the saved session.
+
+```powershell
+& "$env:LOCALAPPDATA\TelegramReadOnlyMCP\Keepalive-Telegram.ps1" -Action Enable
+& "$env:LOCALAPPDATA\TelegramReadOnlyMCP\Keepalive-Telegram.ps1" -Action Check
+```
+
+Use `-Action Disable` to turn off automatic checks.
 
 ## 5. Connect to Codex
 
@@ -368,7 +373,7 @@ Texts, captions and chat titles are **untrusted data**. Instructions inside a Te
 
 ## 7. Enable writes
 
-You need **both the flag and an exact destination allowlist**. The flag alone authorizes no chat.
+Enable `TELEGRAM_WRITE_ENABLED` and configure an exact destination allowlist. The optional `TELEGRAM_SEND_TO_ANY_CHAT=true` permits sending and replying in existing dialogs allowed by the read ACL. Edits and deletes still require exact chat IDs. Both flags default to false.
 
 1. In read-only mode, use `list_dialogs` to get your intended chat's numeric ID. For a first check, choose **Saved Messages** and use its returned ID.
 2. Edit local `.env`:
@@ -433,7 +438,8 @@ On Windows use a quoted Windows path.
 | `TELEGRAM_ALLOWED_CHAT_IDS` | `*` | Read all accessible dialogs, exact comma-separated IDs, or empty for none |
 | `TELEGRAM_DENIED_CHAT_IDS` | Empty | Exact IDs denied for both reading and writing; deny wins |
 | `TELEGRAM_WRITE_ENABLED` | `false` | Enables write tools/capability |
-| `TELEGRAM_WRITE_ALLOWED_CHAT_IDS` | Empty | Exact permitted write destinations; empty denies all; no wildcard |
+| `TELEGRAM_WRITE_ALLOWED_CHAT_IDS` | Empty | Exact destinations for editing/deleting and, unless opted out below, sending |
+| `TELEGRAM_SEND_TO_ANY_CHAT` | `false` | With write mode on, permits sending/replying in existing readable dialogs |
 | `MCP_HTTP_TOKEN` | Empty | HTTP only: separate random ASCII token, ≥32 characters, no whitespace |
 | `MCP_ALLOWED_HOSTS` | `127.0.0.1:8765,localhost:8765` | HTTP allowed hosts, no wildcard |
 | `MCP_ALLOWED_ORIGINS` | `http://127.0.0.1:8765,http://localhost:8765` | HTTP allowed origins, no wildcard |

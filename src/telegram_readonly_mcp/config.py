@@ -30,6 +30,7 @@ class Settings(BaseModel):
     deny_ids: frozenset[int] = frozenset()
     write_enabled: StrictBool = False
     write_allow_ids: frozenset[int] = frozenset()
+    send_to_any_chat: StrictBool = False
     http_token: SecretStr = SecretStr("")
     allowed_hosts: tuple[str, ...] = ("127.0.0.1:8765", "localhost:8765")
     allowed_origins: tuple[str, ...] = ("http://127.0.0.1:8765", "http://localhost:8765")
@@ -82,9 +83,9 @@ def _write_ids(value: str) -> frozenset[int]:
     return result
 
 
-def _write_enabled(value: str) -> bool:
+def _write_enabled(value: str, *, name: str = "TELEGRAM_WRITE_ENABLED") -> bool:
     if value.strip().lower() not in {"true", "false"}:
-        raise PublicError("TELEGRAM_WRITE_ENABLED must be true or false.")
+        raise PublicError(f"{name} must be true or false.")
     return value.strip().lower() == "true"
 
 
@@ -133,6 +134,9 @@ def load_settings(env_file: Path | None = None) -> Settings:
         deny_ids=_ids(value("TELEGRAM_DENIED_CHAT_IDS")) or frozenset(),
         write_enabled=_write_enabled(value("TELEGRAM_WRITE_ENABLED", "false")),
         write_allow_ids=_write_ids(value("TELEGRAM_WRITE_ALLOWED_CHAT_IDS")),
+        send_to_any_chat=_write_enabled(
+            value("TELEGRAM_SEND_TO_ANY_CHAT", "false"), name="TELEGRAM_SEND_TO_ANY_CHAT"
+        ),
         http_token=SecretStr(value("MCP_HTTP_TOKEN")),
         allowed_hosts=hosts,
         allowed_origins=origins,
